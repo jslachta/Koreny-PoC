@@ -3,7 +3,7 @@
 Jednoduchá aplikace pro tvorbu a prohlížení rodokmenů přímo v prohlížeči.
 Žádná registrace, žádný server, žádná data nikam neodesíláme.
 
-**[Otevřít aplikaci →](https://8khz.github.io/Koreny-PoC/)**
+**[Otevřít aplikaci →](https://jslachta.github.io/Koreny-PoC/)**
 
 ## Vaše data jsou vaše
 
