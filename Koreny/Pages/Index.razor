@@ -116,21 +116,21 @@
                             <h2 style="margin-top: 0;">@(_personIsNew ? "Nová osoba" : "Upravit osobu")</h2>
                             <div style="flex: 1; overflow: auto; min-height: 0;">
                                 <div style="display: grid; gap: 0.5rem;">
-                                    <label>Jméno <input @bind="_pGiven" /></label>
-                                    <label>Příjmení <input @bind="_pSurname" /></label>
+                                    <label>Jméno <input @bind="_personForm.Given" /></label>
+                                    <label>Příjmení <input @bind="_personForm.Surname" /></label>
                                     <label>
                                         Pohlaví
-                                        <select @bind="_pSexCode">
+                                        <select @bind="_personForm.SexCode">
                                             <option value="0">Neznámé</option>
                                             <option value="1">Muž</option>
                                             <option value="2">Žena</option>
                                         </select>
                                     </label>
-                                    <label>Rok narození <input type="number" @bind="_pBirthYear" /></label>
-                                    <label>Místo narození <input @bind="_pBirthPlace" /></label>
-                                    <label>Rok úmrtí <input type="number" @bind="_pDeathYear" /></label>
-                                    <label>Místo úmrtí <input @bind="_pDeathPlace" /></label>
-                                    <label>Poznámka <input @bind="_pNote" /></label>
+                                    <label>Datum narození <input @bind="_personForm.BirthDate" placeholder="např. 3 MAR 1901" /></label>
+                                    <label>Místo narození <input @bind="_personForm.BirthPlace" /></label>
+                                    <label>Datum úmrtí <input @bind="_personForm.DeathDate" placeholder="např. 1 MAR 1980" /></label>
+                                    <label>Místo úmrtí <input @bind="_personForm.DeathPlace" /></label>
+                                    <label>Poznámka <input @bind="_personForm.NoteFirst" /></label>
                                 </div>
                             </div>
                             <div style="margin-top: 0.75rem; flex-shrink: 0;">
@@ -159,7 +159,7 @@
                                     <div style="display: grid; gap: 0.5rem;">
                                         <label>
                                             Manžel
-                                            <select @bind="_fHusbandId">
+                                            <select @bind="_familyForm.HusbandId">
                                                 <option value="">(žádný)</option>
                                                 @foreach (var p in _doc.Individuals)
                                                 {
@@ -169,7 +169,7 @@
                                         </label>
                                         <label>
                                             Manželka
-                                            <select @bind="_fWifeId">
+                                            <select @bind="_familyForm.WifeId">
                                                 <option value="">(žádná)</option>
                                                 @foreach (var p in _doc.Individuals)
                                                 {
@@ -188,8 +188,8 @@
                                                 </label>
                                             }
                                         </fieldset>
-                                        <label>Rok sňatku <input type="number" @bind="_fMarriageYear" /></label>
-                                        <label>Místo sňatku <input @bind="_fMarriagePlace" /></label>
+                                        <label>Datum sňatku <input @bind="_familyForm.MarriageDate" placeholder="např. 15 JUN 1925" /></label>
+                                        <label>Místo sňatku <input @bind="_familyForm.MarriagePlace" /></label>
                                     </div>
                                 </div>
                                 <div style="margin-top: 0.75rem; flex-shrink: 0;">
@@ -258,19 +258,9 @@
     private string? _editPersonId;
     private string? _editFamilyId;
 
-    private string _pGiven = string.Empty;
-    private string _pSurname = string.Empty;
-    private int _pSexCode;
-    private int? _pBirthYear;
-    private string _pBirthPlace = string.Empty;
-    private int? _pDeathYear;
-    private string _pDeathPlace = string.Empty;
-    private string _pNote = string.Empty;
+    private PersonFormState _personForm = new();
 
-    private string _fHusbandId = string.Empty;
-    private string _fWifeId = string.Empty;
-    private int? _fMarriageYear;
-    private string _fMarriagePlace = string.Empty;
+    private FamilyFormState _familyForm = new();
     private readonly Dictionary<string, bool> _fChildSel = new(StringComparer.Ordinal);
     private string _pickFamilyId = string.Empty;
 
@@ -607,7 +597,7 @@
         _panel = PanelView.Person;
         _personIsNew = true;
         _editPersonId = null;
-        ClearPersonForm();
+        _personForm = new PersonFormState();
     }
 
     private void OpenPersonForEdit(string id)
@@ -621,31 +611,8 @@
         _personIsNew = false;
         _editPersonId = id;
         var p = _doc.Individuals.First(x => x.Id == id);
-        _pGiven = p.Name?.GivenName ?? string.Empty;
-        _pSurname = p.Name?.Surname ?? string.Empty;
-        _pSexCode = p.Sex switch
-        {
-            "M" => 1,
-            "F" => 2,
-            _ => 0,
-        };
-        _pBirthYear = p.Birth?.ParsedYear;
-        _pBirthPlace = p.Birth?.Place ?? string.Empty;
-        _pDeathYear = p.Death?.ParsedYear;
-        _pDeathPlace = p.Death?.Place ?? string.Empty;
-        _pNote = p.Notes.FirstOrDefault() ?? string.Empty;
-    }
-
-    private void ClearPersonForm()
-    {
-        _pGiven = string.Empty;
-        _pSurname = string.Empty;
-        _pSexCode = 0;
-        _pBirthYear = null;
-        _pBirthPlace = string.Empty;
-        _pDeathYear = null;
-        _pDeathPlace = string.Empty;
-        _pNote = string.Empty;
+        _personForm = new PersonFormState();
+        _personForm.Fill(p);
     }
 
     private void SavePerson()
@@ -671,61 +638,11 @@
             ind = _doc.Individuals.First(x => x.Id == _editPersonId);
         }
 
-        ApplyPersonForm(ind);
+        _personForm.ApplyTo(ind);
         GedcomSync.SyncIndividual(_doc, ind);
         _panel = PanelView.None;
         EnsureRootPersonId();
         StateHasChanged();
-    }
-
-    private void ApplyPersonForm(GedcomIndividual ind)
-    {
-        var sur = _pSurname.Trim();
-        var giv = _pGiven.Trim();
-        ind.Name = new GedcomName
-        {
-            GivenName = string.IsNullOrEmpty(giv) ? null : giv,
-            Surname = string.IsNullOrEmpty(sur) ? null : sur,
-            Raw = $"/{sur}/ {giv}".Trim(),
-        };
-        ind.Sex = _pSexCode switch
-        {
-            1 => "M",
-            2 => "F",
-            _ => null,
-        };
-
-        if (_pBirthYear is not null || !string.IsNullOrWhiteSpace(_pBirthPlace))
-        {
-            ind.Birth = new GedcomEvent
-            {
-                Date = _pBirthYear?.ToString(),
-                Place = string.IsNullOrWhiteSpace(_pBirthPlace) ? null : _pBirthPlace.Trim(),
-            };
-        }
-        else
-        {
-            ind.Birth = null;
-        }
-
-        if (_pDeathYear is not null || !string.IsNullOrWhiteSpace(_pDeathPlace))
-        {
-            ind.Death = new GedcomEvent
-            {
-                Date = _pDeathYear?.ToString(),
-                Place = string.IsNullOrWhiteSpace(_pDeathPlace) ? null : _pDeathPlace.Trim(),
-            };
-        }
-        else
-        {
-            ind.Death = null;
-        }
-
-        ind.Notes.Clear();
-        if (!string.IsNullOrWhiteSpace(_pNote))
-        {
-            ind.Notes.Add(_pNote.Trim());
-        }
     }
 
     private void DeletePerson()
@@ -805,10 +722,8 @@
         _familyIsNew = false;
         _editFamilyId = id;
         _pickFamilyId = id;
-        _fHusbandId = f.HusbandId ?? string.Empty;
-        _fWifeId = f.WifeId ?? string.Empty;
-        _fMarriageYear = f.Marriage?.ParsedYear;
-        _fMarriagePlace = f.Marriage?.Place ?? string.Empty;
+        _familyForm = new FamilyFormState();
+        _familyForm.Fill(f);
         _fChildSel.Clear();
         foreach (var p in _doc.Individuals)
         {
@@ -818,10 +733,7 @@
 
     private void ClearFamilyForm()
     {
-        _fHusbandId = string.Empty;
-        _fWifeId = string.Empty;
-        _fMarriageYear = null;
-        _fMarriagePlace = string.Empty;
+        _familyForm = new FamilyFormState();
         _fChildSel.Clear();
         if (_doc is not null)
         {
@@ -866,26 +778,12 @@
             fam = _doc.Families.First(x => x.Id == _editFamilyId);
         }
 
-        fam.HusbandId = string.IsNullOrEmpty(_fHusbandId) ? null : _fHusbandId;
-        fam.WifeId = string.IsNullOrEmpty(_fWifeId) ? null : _fWifeId;
-        fam.ChildrenIds.Clear();
-        foreach (var kv in _fChildSel.Where(kv => kv.Value))
-        {
-            fam.ChildrenIds.Add(kv.Key);
-        }
-
-        if (_fMarriageYear is not null || !string.IsNullOrWhiteSpace(_fMarriagePlace))
-        {
-            fam.Marriage = new GedcomEvent
-            {
-                Date = _fMarriageYear?.ToString(),
-                Place = string.IsNullOrWhiteSpace(_fMarriagePlace) ? null : _fMarriagePlace.Trim(),
-            };
-        }
-        else
-        {
-            fam.Marriage = null;
-        }
+        // Vybrané děti v pořadí seznamu osob; SyncFamily zachová pořadí existujících CHIL uzlů.
+        _familyForm.ChildIds = _doc.Individuals
+            .Where(p => _fChildSel.TryGetValue(p.Id, out var on) && on)
+            .Select(p => p.Id)
+            .ToList();
+        _familyForm.ApplyTo(fam);
 
         GedcomSync.SyncFamily(_doc, fam);
         _panel = PanelView.None;

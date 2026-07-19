@@ -107,4 +107,63 @@ public class GedcomEditPreservationTests
 
         AssertMatches(GedcomWriter.Write(doc), "edit-d-delete.ged");
     }
+
+    /// <summary>
+    /// (e) IDEMPOTENCE: pro každý korpus otevři a ulož BEZE ZMĚNY každou osobu i rodinu
+    /// (Fill → ApplyTo → sync — stejná cesta jako UI). Export musí být sémanticky totožný
+    /// s importem. Toto je hlavní důkaz, že editační formulář už není ztrátový.
+    /// </summary>
+    [Theory]
+    [InlineData("corpus-01-myheritage.ged")]
+    [InlineData("corpus-02-ancestry.ged")]
+    [InlineData("corpus-03-notes.ged")]
+    [InlineData("corpus-04-events.ged")]
+    [InlineData("corpus-05-relations.ged")]
+    [InlineData("corpus-06-utf8-diakritika.ged")]
+    public void Edit_SaveUnchanged_IsIdempotent(string corpusFile)
+    {
+        var original = Read(Path.Combine("Corpus", corpusFile));
+        var doc = _parser.Parse(original);
+
+        foreach (var ind in doc.Individuals.ToList())
+        {
+            var form = new PersonFormState();
+            form.Fill(ind);
+            form.ApplyTo(ind);
+            GedcomSync.SyncIndividual(doc, ind);
+        }
+
+        foreach (var fam in doc.Families.ToList())
+        {
+            var form = new FamilyFormState();
+            form.Fill(fam);
+            form.ApplyTo(fam);
+            GedcomSync.SyncFamily(doc, fam);
+        }
+
+        var report = GedcomSemanticDiff.Compare(original, GedcomWriter.Write(doc));
+        Assert.True(report.IsEmpty, $"Uložení beze změny změnilo {corpusFile}.{Environment.NewLine}{report}");
+    }
+
+    /// <summary>
+    /// (f) Změna jen křestního jména osobě s plným datem narození: export nese změněné jméno
+    /// A zachované plné datum „3 MAR 1901" (žádná degradace na rok).
+    /// </summary>
+    [Fact]
+    public void Edit_RenameKeepsFullBirthDate()
+    {
+        var doc = _parser.Parse(Read(Path.Combine("Corpus", "corpus-01-myheritage.ged")));
+        var ind = doc.Individuals.First(i => i.Id == "I1");
+
+        var form = new PersonFormState();
+        form.Fill(ind);
+        form.Given = "Honza"; // změna jen jména; příjmení, datum, místo beze změny
+        form.ApplyTo(ind);
+        GedcomSync.SyncIndividual(doc, ind);
+
+        var exported = GedcomWriter.Write(doc);
+        Assert.Contains("/Novák/ Honza", exported);
+        Assert.Contains("3 MAR 1901", exported);
+        Assert.DoesNotContain("Jan /Novák/", exported);
+    }
 }
