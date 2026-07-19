@@ -162,7 +162,7 @@ public class GedcomEditPreservationTests
         GedcomSync.SyncIndividual(doc, ind);
 
         var exported = GedcomWriter.Write(doc);
-        Assert.Contains("/Novák/ Honza", exported);
+        Assert.Contains("Honza /Novák/", exported); // rekonstrukce v konvenčním pořadí Jméno /Příjmení/
         Assert.Contains("3 MAR 1901", exported);
         Assert.DoesNotContain("Jan /Novák/", exported);
     }

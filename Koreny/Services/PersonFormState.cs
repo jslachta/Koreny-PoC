@@ -97,12 +97,12 @@ public sealed class PersonFormState
             return;
         }
 
-        // Skutečná změna jména: rekonstruuj v konvenci UI (příjmení ve lomítkách).
+        // Skutečná změna jména: rekonstruuj v konvenčním pořadí „Jméno /Příjmení/".
         ind.Name = new GedcomName
         {
             GivenName = GedcomFormValues.NullIfEmpty(g),
             Surname = GedcomFormValues.NullIfEmpty(s),
-            Raw = $"/{s}/ {g}".Trim(),
+            Raw = s.Length > 0 ? $"{g} /{s}/".Trim() : g,
         };
     }
 
