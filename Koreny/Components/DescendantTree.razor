@@ -1,21 +1,13 @@
 @using System.Text
 @using Koreny.Models
+@using Koreny.Services
 
-@* Read-only SVG generator; use RenderToSvg(). *@
+@* Read-only SVG generator; use RenderToSvg(). Layout counts on DescendantLayout; here jen prezentace. *@
 
 @code {
-    public const double NODE_WIDTH = 160;
-    public const double NODE_HEIGHT = 56;
-    public const double H_GAP = 24;
-    public const double V_GAP = 80;
-
-    private const double Padding = 24;
     private const double NameLineY = 22;
     private const double LifespanLineY = 42;
     private const int MaxNameChars = 26;
-
-    private static double SlotPitch => NODE_WIDTH + H_GAP;
-    private static double RowPitch => NODE_HEIGHT + V_GAP;
 
     [Parameter]
     public GedcomDocument? Document { get; set; }
@@ -42,28 +34,13 @@
             return EmptySvg("Person not found.");
         }
 
-        var visiting = new HashSet<string>(StringComparer.Ordinal);
-        var layoutRoot = BuildDescNode(document, rootPersonId, visiting);
-        if (layoutRoot is null)
+        var layout = DescendantLayout.Compute(document, rootPersonId);
+        if (layout is null)
         {
             return EmptySvg("Nothing to display.");
         }
 
-        var nextSlot = 0;
-        AssignLeafSlots(ref nextSlot, layoutRoot);
-
-        var segments = new List<LineSeg>();
-        var boxes = new List<PersonBox>();
-        LayoutGeometry(document, layoutRoot, 0, segments, boxes);
-
-        var w = nextSlot <= 0
-            ? Padding * 2 + NODE_WIDTH
-            : Padding * 2 + (nextSlot - 1) * SlotPitch + NODE_WIDTH;
-        var depth = GetMaxDepth(layoutRoot);
-        var generations = depth + 1;
-        var h = generations * (NODE_HEIGHT + V_GAP);
-
-        return BuildSvgXml(w, h, segments, boxes);
+        return BuildSvgXml(document, layout);
     }
 
     private static string N(double v) => v.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -74,215 +51,36 @@
         return $"""<svg xmlns="http://www.w3.org/2000/svg" width="320" height="80" viewBox="0 0 320 80"><text x="160" y="44" text-anchor="middle" font-size="13" fill="#333">{e}</text></svg>""";
     }
 
-    private static string BuildSvgXml(double width, double height, List<LineSeg> segments, List<PersonBox> boxes)
+    private static string BuildSvgXml(GedcomDocument document, DescendantLayoutResult layout)
     {
+        var w = layout.Width;
+        var h = layout.Height;
+        var nodeW = DescendantLayout.NodeWidth;
+        var nodeH = DescendantLayout.NodeHeight;
+
         var sb = new StringBuilder();
-        sb.Append($"""<svg xmlns="http://www.w3.org/2000/svg" width="{N(width)}" height="{N(height)}" viewBox="0 0 {N(width)} {N(height)}">""");
+        sb.Append($"""<svg xmlns="http://www.w3.org/2000/svg" width="{N(w)}" height="{N(h)}" viewBox="0 0 {N(w)} {N(h)}">""");
         sb.Append("""<g stroke="#2a2a2a" stroke-width="1.5" fill="none">""");
-        foreach (var seg in segments)
+        foreach (var seg in layout.Segments)
         {
             sb.Append($"<line x1=\"{N(seg.X1)}\" y1=\"{N(seg.Y1)}\" x2=\"{N(seg.X2)}\" y2=\"{N(seg.Y2)}\" />");
         }
 
         sb.Append("</g><g>");
-        foreach (var box in boxes)
+        foreach (var box in layout.Boxes)
         {
-            var left = box.CenterX - NODE_WIDTH * 0.5;
+            var ind = document.FindIndividual(box.Id);
+            var name = ind?.FullName;
+            name = string.IsNullOrWhiteSpace(name) ? box.Id : name;
+            var left = box.CenterX - nodeW * 0.5;
             var top = box.Y;
-            sb.Append($"<rect x=\"{N(left)}\" y=\"{N(top)}\" width=\"{N(NODE_WIDTH)}\" height=\"{N(NODE_HEIGHT)}\" fill=\"{box.Fill}\" stroke=\"#1a1a1a\" />");
-            sb.Append($"<text x=\"{N(box.CenterX)}\" y=\"{N(top + NameLineY)}\" text-anchor=\"middle\" font-size=\"13\" fill=\"white\">{SvgEscape(box.FullName)}</text>");
-            sb.Append($"<text x=\"{N(box.CenterX)}\" y=\"{N(top + LifespanLineY)}\" text-anchor=\"middle\" font-size=\"13\" fill=\"white\">{SvgEscape(box.Lifespan)}</text>");
+            sb.Append($"<rect x=\"{N(left)}\" y=\"{N(top)}\" width=\"{N(nodeW)}\" height=\"{N(nodeH)}\" fill=\"{FillFor(ind)}\" stroke=\"#1a1a1a\" />");
+            sb.Append($"<text x=\"{N(box.CenterX)}\" y=\"{N(top + NameLineY)}\" text-anchor=\"middle\" font-size=\"13\" fill=\"white\">{SvgEscape(Truncate(name))}</text>");
+            sb.Append($"<text x=\"{N(box.CenterX)}\" y=\"{N(top + LifespanLineY)}\" text-anchor=\"middle\" font-size=\"13\" fill=\"white\">{SvgEscape(FormatLife(ind))}</text>");
         }
 
         sb.Append("</g></svg>");
         return sb.ToString();
-    }
-
-    private static int GetMaxDepth(DescNode n)
-    {
-        if (n.Children.Count == 0)
-        {
-            return 0;
-        }
-
-        return 1 + n.Children.Max(GetMaxDepth);
-    }
-
-    private static DescNode? BuildDescNode(GedcomDocument document, string personId, HashSet<string> visiting)
-    {
-        if (!visiting.Add(personId))
-        {
-            return new DescNode { LeafId = personId };
-        }
-
-        try
-        {
-            var fams = document.Families
-                .Where(f => f.HusbandId == personId || f.WifeId == personId)
-                .ToList();
-            if (fams.Count == 0)
-            {
-                return new DescNode { LeafId = personId };
-            }
-
-            var fam = fams[0];
-            var childIds = fams.SelectMany(f => f.ChildrenIds).Distinct(StringComparer.Ordinal).ToList();
-            var children = new List<DescNode>();
-            foreach (var cid in childIds)
-            {
-                var ch = BuildDescNode(document, cid, visiting);
-                if (ch is not null)
-                {
-                    children.Add(ch);
-                }
-            }
-
-            return new DescNode
-            {
-                HusbId = fam.HusbandId,
-                WifeId = fam.WifeId,
-                Children = children,
-            };
-        }
-        finally
-        {
-            visiting.Remove(personId);
-        }
-    }
-
-    /// <summary>Post-order leaf slots; childless couple reserves two slots so partner boxes fit the pitch.</summary>
-    private static void AssignLeafSlots(ref int nextSlot, DescNode n)
-    {
-        if (n.Children.Count > 0)
-        {
-            foreach (var c in n.Children)
-            {
-                AssignLeafSlots(ref nextSlot, c);
-            }
-
-            n.SlotMin = n.Children.Min(c => c.SlotMin);
-            n.SlotMax = n.Children.Max(c => c.SlotMax);
-            return;
-        }
-
-        if (n.LeafId is not null)
-        {
-            n.SlotMin = n.SlotMax = nextSlot++;
-            return;
-        }
-
-        if (!string.IsNullOrEmpty(n.HusbId) && !string.IsNullOrEmpty(n.WifeId))
-        {
-            n.SlotMin = nextSlot;
-            n.SlotMax = nextSlot + 1;
-            nextSlot += 2;
-            return;
-        }
-
-        n.SlotMin = n.SlotMax = nextSlot++;
-    }
-
-    /// <summary>Trunk drops from couple midline; bendY splits between generations so edges do not cross boxes.</summary>
-    private static void LayoutGeometry(
-        GedcomDocument document,
-        DescNode n,
-        int depth,
-        List<LineSeg> segments,
-        List<PersonBox> boxes)
-    {
-        var cx = RangeCenterX(n.SlotMin, n.SlotMax);
-        var y = depth * RowPitch;
-        var rowMidY = y + NODE_HEIGHT * 0.5;
-
-        if (n.IsLeaf)
-        {
-            boxes.Add(MakeBox(document, n.LeafId!, cx, y));
-            return;
-        }
-
-        var h = n.HusbId;
-        var w = n.WifeId;
-        if (!string.IsNullOrEmpty(h) && !string.IsNullOrEmpty(w))
-        {
-            var totalW = NODE_WIDTH + H_GAP + NODE_WIDTH;
-            var leftCx = cx - totalW * 0.5 + NODE_WIDTH * 0.5;
-            var rightCx = cx + totalW * 0.5 - NODE_WIDTH * 0.5;
-            boxes.Add(MakeBox(document, h, leftCx, y));
-            boxes.Add(MakeBox(document, w, rightCx, y));
-            segments.Add(new LineSeg
-            {
-                X1 = leftCx + NODE_WIDTH * 0.5,
-                Y1 = rowMidY,
-                X2 = rightCx - NODE_WIDTH * 0.5,
-                Y2 = rowMidY,
-            });
-        }
-        else
-        {
-            var only = !string.IsNullOrEmpty(h) ? h : w;
-            if (!string.IsNullOrEmpty(only))
-            {
-                boxes.Add(MakeBox(document, only, cx, y));
-            }
-        }
-
-        if (n.Children.Count == 0)
-        {
-            return;
-        }
-
-        var childTopY = (depth + 1) * RowPitch;
-        var bendY = rowMidY + (childTopY - rowMidY) * 0.5;
-
-        segments.Add(new LineSeg { X1 = cx, Y1 = rowMidY, X2 = cx, Y2 = bendY });
-
-        if (n.Children.Count == 1)
-        {
-            var ccx = RangeCenterX(n.Children[0].SlotMin, n.Children[0].SlotMax);
-            if (Math.Abs(ccx - cx) > 0.01)
-            {
-                segments.Add(new LineSeg { X1 = cx, Y1 = bendY, X2 = ccx, Y2 = bendY });
-            }
-
-            segments.Add(new LineSeg { X1 = ccx, Y1 = bendY, X2 = ccx, Y2 = childTopY });
-        }
-        else
-        {
-            var xs = n.Children.Select(c => RangeCenterX(c.SlotMin, c.SlotMax)).ToList();
-            var minX = xs.Min();
-            var maxX = xs.Max();
-            segments.Add(new LineSeg { X1 = minX, Y1 = bendY, X2 = maxX, Y2 = bendY });
-            foreach (var x in xs)
-            {
-                segments.Add(new LineSeg { X1 = x, Y1 = bendY, X2 = x, Y2 = childTopY });
-            }
-        }
-
-        foreach (var c in n.Children)
-        {
-            LayoutGeometry(document, c, depth + 1, segments, boxes);
-        }
-    }
-
-    private static double RangeCenterX(int slotMin, int slotMax)
-    {
-        var left = Padding + slotMin * SlotPitch;
-        var right = Padding + slotMax * SlotPitch + NODE_WIDTH;
-        return (left + right) * 0.5;
-    }
-
-    private static PersonBox MakeBox(GedcomDocument document, string id, double centerX, double y)
-    {
-        var ind = document.FindIndividual(id);
-        var name = ind?.FullName ?? id;
-        return new PersonBox
-        {
-            CenterX = centerX,
-            Y = y,
-            FullName = Truncate(string.IsNullOrWhiteSpace(name) ? id : name),
-            Lifespan = FormatLife(ind),
-            Fill = FillFor(ind),
-        };
     }
 
     private static string FillFor(GedcomIndividual? i)
@@ -345,34 +143,5 @@
             .Replace(">", "&gt;", StringComparison.Ordinal)
             .Replace("\"", "&quot;", StringComparison.Ordinal)
             .Replace("'", "&apos;", StringComparison.Ordinal);
-    }
-
-    private sealed class DescNode
-    {
-        public string? LeafId { get; init; }
-        public string? HusbId { get; init; }
-        public string? WifeId { get; init; }
-        public List<DescNode> Children { get; init; } = new();
-        public int SlotMin { get; set; }
-        public int SlotMax { get; set; }
-
-        public bool IsLeaf => Children.Count == 0 && LeafId is not null;
-    }
-
-    private sealed class PersonBox
-    {
-        public double CenterX { get; init; }
-        public double Y { get; init; }
-        public required string FullName { get; init; }
-        public required string Lifespan { get; init; }
-        public required string Fill { get; init; }
-    }
-
-    private sealed class LineSeg
-    {
-        public double X1 { get; init; }
-        public double Y1 { get; init; }
-        public double X2 { get; init; }
-        public double Y2 { get; init; }
     }
 }
