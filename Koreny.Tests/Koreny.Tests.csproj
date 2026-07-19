@@ -21,4 +21,8 @@
     <ProjectReference Include="..\Koreny\Koreny.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Corpus\**\*.ged" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

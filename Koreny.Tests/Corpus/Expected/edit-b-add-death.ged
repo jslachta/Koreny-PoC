@@ -1,0 +1,45 @@
+0 HEAD
+1 SOUR TestCorpus
+1 GEDC
+2 VERS 5.5.1
+2 FORM Lineage-Linked
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Josef /Lada/
+2 GIVN Josef
+2 SURN Lada
+2 NICK Pepa
+2 TYPE birth
+1 NAME Josef /Malovaný/
+2 TYPE aka
+1 SEX M
+1 BIRT Y
+1 CHR
+2 DATE 20 DEC 1887
+2 PLAC Hrusice
+1 OCCU malíř a ilustrátor
+1 EVEN
+2 TYPE Vojenská služba
+2 DATE 1908
+1 BURI
+2 DATE 1957
+2 PLAC Praha
+1 DEAT
+2 DATE 13 DEC 1957
+0 @I2@ INDI
+1 NAME Hana /Ladová/
+1 SEX F
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 ENGA
+2 DATE 1922
+1 MARR
+2 DATE 1923
+2 PLAC Praha
+1 MARR
+2 DATE 1930
+2 PLAC Brno
+1 DIV
+2 DATE 1928
+0 TRLR

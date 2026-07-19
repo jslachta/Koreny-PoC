@@ -1,0 +1,22 @@
+0 HEAD
+1 SOUR TestCorpus
+1 GEDC
+2 VERS 5.5.1
+2 FORM Lineage-Linked
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Alois /Jirásek/
+1 NOTE Tato poznámka pokračuje na dalším logickém řádku
+2 CONT a toto je její druhý logický řádek.
+1 NOTE Slovo je rozdě
+2 CONC lené uprostřed a lámání nesmí vložit mezeru.
+1 NOTE @N1@
+0 @I2@ INDI
+1 NAME Marie /Dlouhá/
+1 NOTE Tato poznámka je záměrně delší než 255 znaků, aby po slití pokračovacích řádků vznikla logická hodnota,
+2 CONC  kterou GEDCOM 5.5.1 vyžaduje při zápisu rozlámat zpět na fyzické řádky pomocí CONC. Obsahuje také české znaky
+2 CONC  jako příliš žluťoučký kůň úpěl ďábelské ódy, aby se ověřilo, že se při slévání a porovnávání neztrácí diakritika
+2 CONC  ani na hranicích lámání.
+0 @N1@ NOTE Sdílená poznámka odkazovaná pointerem z osoby @I1@
+1 CONT a její druhý řádek textu.
+0 TRLR

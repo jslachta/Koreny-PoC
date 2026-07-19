@@ -4,136 +4,200 @@ using Koreny.Models;
 
 namespace Koreny.Services;
 
+/// <summary>
+/// Writer = rekurzivní serializace stromu <see cref="GedcomDocument.Nodes"/>
+/// (viz docs/audit-gedcom.md, sekce 4). Pořadí uzlů je pořadím výstupu — žádné řazení
+/// podle ID. Dlouhé hodnoty se lámou zpět na CONC/CONT (rozlámání dělá výhradně writer).
+///
+/// Hlavička: importovaný dokument si nese původní HEAD (pouze SOUR/DATE uvnitř HEAD se
+/// přepíší razítkem Kořeny); dokument vytvořený od nuly (bez uzlů) dostane syntetickou
+/// hlavičku. TRLR se doplní, pokud chybí.
+/// </summary>
 public static class GedcomWriter
 {
+    /// <summary>Konzervativní rozpočet znaků hodnoty na jeden fyzický řádek (5.5.1: level+delim+tag+value ≤ 255).</summary>
+    private const int MaxValueLength = 200;
+
+    private const string AppSource = "Koreny";
+    private const string AppName = "Kořeny";
+    private const string GedcomVersion = "5.5.1";
+
     /// <summary>Serialises a document to GEDCOM 5.5.1 lines (UTF-8 string; caller handles file encoding).</summary>
     public static string Write(GedcomDocument doc)
     {
         var sb = new StringBuilder();
-        WriteHead(sb);
-
-        foreach (var ind in doc.Individuals.OrderBy(i => i.Id, StringComparer.Ordinal))
+        foreach (var root in PrepareRoots(doc))
         {
-            WriteIndividual(sb, ind);
+            WriteNode(sb, root, 0);
         }
 
-        foreach (var fam in doc.Families.OrderBy(f => f.Id, StringComparer.Ordinal))
-        {
-            WriteFamily(sb, fam);
-        }
-
-        WriteLine(sb, 0, "TRLR");
         return sb.ToString();
     }
 
-    private static void WriteHead(StringBuilder sb)
+    // ------------------------------------------------------------- příprava kořenů
+
+    private static List<GedcomNode> PrepareRoots(GedcomDocument doc)
     {
-        WriteLine(sb, 0, "HEAD");
-        WriteLine(sb, 1, "SOUR", "Koreny");
-        WriteLine(sb, 1, "GEDC");
-        WriteLine(sb, 2, "VERS", "5.5.1");
+        var result = new List<GedcomNode>();
+
+        var head = doc.Nodes.FirstOrDefault(n => n.Tag == "HEAD");
+        if (head is null)
+        {
+            result.Add(BuildSyntheticHead());
+        }
+        else
+        {
+            StampHead(head);
+            result.Add(head);
+        }
+
+        foreach (var n in doc.Nodes)
+        {
+            if (n.Tag is "HEAD" or "TRLR")
+            {
+                continue;
+            }
+
+            result.Add(n);
+        }
+
+        result.Add(doc.Nodes.FirstOrDefault(n => n.Tag == "TRLR") ?? new GedcomNode("TRLR"));
+        return result;
+    }
+
+    private static GedcomNode BuildSyntheticHead()
+    {
+        var head = new GedcomNode("HEAD");
+        var sour = new GedcomNode("SOUR", value: AppSource);
+        sour.Children.Add(new GedcomNode("NAME", value: AppName));
+        sour.Children.Add(new GedcomNode("VERS", value: GedcomVersion));
+        head.Children.Add(sour);
+
+        var gedc = new GedcomNode("GEDC");
+        gedc.Children.Add(new GedcomNode("VERS", value: GedcomVersion));
         // FORM Lineage-Linked is required when INDI/FAM use lineage-linked structures.
-        WriteLine(sb, 2, "FORM", "Lineage-Linked");
-        WriteLine(sb, 1, "CHAR", "UTF-8");
+        gedc.Children.Add(new GedcomNode("FORM", value: "Lineage-Linked"));
+        head.Children.Add(gedc);
+
+        head.Children.Add(new GedcomNode("CHAR", value: "UTF-8"));
+        head.Children.Add(new GedcomNode("DATE", value: StampDate()));
+        return head;
     }
 
-    private static void WriteIndividual(StringBuilder sb, GedcomIndividual ind)
+    /// <summary>
+    /// Přepíše razítkovací tagy uvnitř původní HEAD (SOUR → Kořeny, DATE → dnešek).
+    /// Zbytek hlavičky (GEDC/FORM, CHAR, LANG, SUBM…) zůstává. Tyto tagy jsou navíc
+    /// při sémantickém porovnání ignorovány (viz normalizace d v GedcomSemanticDiff),
+    /// takže razítko round-trip test neovlivní.
+    /// </summary>
+    private static void StampHead(GedcomNode head)
     {
-        WriteLine(sb, 0, $"@{ind.Id}@", "INDI");
-        if (ind.Name is not null)
+        var sour = head.FirstChild("SOUR");
+        if (sour is null)
         {
-            WriteLine(sb, 1, "NAME", ind.Name.Raw.Trim());
+            sour = new GedcomNode("SOUR");
+            head.Children.Insert(0, sour);
         }
 
-        if (!string.IsNullOrEmpty(ind.Sex))
+        sour.Value = AppSource;
+        sour.Children.Clear();
+        sour.Children.Add(new GedcomNode("NAME", value: AppName));
+        sour.Children.Add(new GedcomNode("VERS", value: GedcomVersion));
+
+        var date = head.FirstChild("DATE");
+        if (date is null)
         {
-            WriteLine(sb, 1, "SEX", ind.Sex);
+            head.Children.Add(new GedcomNode("DATE", value: StampDate()));
         }
-
-        WriteEvent(sb, "BIRT", ind.Birth);
-        WriteEvent(sb, "DEAT", ind.Death);
-
-        foreach (var note in ind.Notes)
+        else
         {
-            if (note.Length > 0)
-            {
-                WriteLine(sb, 1, "NOTE", note);
-            }
+            date.Value = StampDate();
+            date.Children.Clear();
         }
     }
 
-    private static void WriteFamily(StringBuilder sb, GedcomFamily fam)
+    private static string StampDate() =>
+        DateTime.UtcNow.ToString("d MMM yyyy", CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    // ------------------------------------------------------------- serializace uzlů
+
+    private static void WriteNode(StringBuilder sb, GedcomNode node, int level)
     {
-        WriteLine(sb, 0, $"@{fam.Id}@", "FAM");
-        if (!string.IsNullOrEmpty(fam.HusbandId))
+        WriteValueLines(sb, level, node.Xref, node.Tag, node.Value);
+        foreach (var child in node.Children)
         {
-            WriteLine(sb, 1, "HUSB", $"@{fam.HusbandId}@");
-        }
-
-        if (!string.IsNullOrEmpty(fam.WifeId))
-        {
-            WriteLine(sb, 1, "WIFE", $"@{fam.WifeId}@");
-        }
-
-        foreach (var ch in fam.ChildrenIds)
-        {
-            if (!string.IsNullOrEmpty(ch))
-            {
-                WriteLine(sb, 1, "CHIL", $"@{ch}@");
-            }
-        }
-
-        if (fam.Marriage is not null && (fam.Marriage.Date is not null || fam.Marriage.Place is not null))
-        {
-            WriteLine(sb, 1, "MARR");
-            if (fam.Marriage.Date is not null)
-            {
-                WriteLine(sb, 2, "DATE", fam.Marriage.Date);
-            }
-
-            if (fam.Marriage.Place is not null)
-            {
-                WriteLine(sb, 2, "PLAC", fam.Marriage.Place);
-            }
+            WriteNode(sb, child, level + 1);
         }
     }
 
-    private static void WriteEvent(StringBuilder sb, string tag, GedcomEvent? ev)
+    /// <summary>
+    /// Rozloží logickou hodnotu zpět na fyzické řádky: logické řádky (oddělené '\n')
+    /// jako CONT, příliš dlouhé segmenty jako CONC. Fyzický řádek nikdy nekončí mezerou
+    /// (diff dělá TrimEnd), takže mezera na hranici lámání přejde na začátek dalšího
+    /// CONC řádku — přesně to, co slévání v parseru a v diffu očekává.
+    /// </summary>
+    private static void WriteValueLines(StringBuilder sb, int level, string? xref, string tag, string value)
     {
-        if (ev is null)
+        var logicalLines = value.Split('\n');
+        for (var li = 0; li < logicalLines.Length; li++)
         {
-            return;
-        }
-
-        if (ev.Date is null && ev.Place is null)
-        {
-            return;
-        }
-
-        WriteLine(sb, 1, tag);
-        if (ev.Date is not null)
-        {
-            WriteLine(sb, 2, "DATE", ev.Date);
-        }
-
-        if (ev.Place is not null)
-        {
-            WriteLine(sb, 2, "PLAC", ev.Place);
+            var chunks = SplitForConc(logicalLines[li]);
+            for (var ci = 0; ci < chunks.Count; ci++)
+            {
+                if (li == 0 && ci == 0)
+                {
+                    WritePhysical(sb, level, xref, tag, chunks[ci]);
+                }
+                else if (ci == 0)
+                {
+                    WritePhysical(sb, level + 1, null, "CONT", chunks[ci]);
+                }
+                else
+                {
+                    WritePhysical(sb, level + 1, null, "CONC", chunks[ci]);
+                }
+            }
         }
     }
 
-    private static void WriteLine(StringBuilder sb, int level, string rest)
+    private static List<string> SplitForConc(string text)
+    {
+        var chunks = new List<string>();
+        if (text.Length <= MaxValueLength)
+        {
+            chunks.Add(text);
+            return chunks;
+        }
+
+        var pos = 0;
+        while (pos < text.Length)
+        {
+            var len = Math.Min(MaxValueLength, text.Length - pos);
+            if (pos + len < text.Length)
+            {
+                // Nenechávej koncovou mezeru na fyzickém řádku — přesuň ji na začátek dalšího CONC.
+                while (len > 1 && text[pos + len - 1] == ' ')
+                {
+                    len--;
+                }
+            }
+
+            chunks.Add(text.Substring(pos, len));
+            pos += len;
+        }
+
+        return chunks;
+    }
+
+    private static void WritePhysical(StringBuilder sb, int level, string? xref, string tag, string value)
     {
         sb.Append(level.ToString(CultureInfo.InvariantCulture));
         sb.Append(' ');
-        sb.Append(rest);
-        sb.Append('\n');
-    }
+        if (xref is not null)
+        {
+            sb.Append('@').Append(xref).Append('@').Append(' ');
+        }
 
-    private static void WriteLine(StringBuilder sb, int level, string tag, string value)
-    {
-        sb.Append(level.ToString(CultureInfo.InvariantCulture));
-        sb.Append(' ');
         sb.Append(tag);
         if (value.Length > 0)
         {

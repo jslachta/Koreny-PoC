@@ -1,0 +1,33 @@
+0 HEAD
+1 SOUR TestCorpus
+1 GEDC
+2 VERS 5.5.1
+2 FORM Lineage-Linked
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Jiří /Šťastný/
+1 SEX M
+1 BIRT
+2 DATE 24 OCT 1901
+2 PLAC Kroměříž
+1 DEAT
+2 DATE 3 APR 1978
+2 PLAC Přerov
+1 NOTE Poznámka s diakritikou: příliš žluťoučký kůň úpěl ďábelské ódy.
+0 @I2@ INDI
+1 NAME Růžena /Šťastná/
+1 SEX F
+1 BIRT
+2 DATE 1905
+2 PLAC Bystřice pod Hostýnem
+0 @I3@ INDI
+1 NAME Věra /Šťastná/
+1 SEX F
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I3@
+1 MARR
+2 DATE 1926
+2 PLAC Holešov
+0 TRLR

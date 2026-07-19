@@ -1,0 +1,36 @@
+0 HEAD
+1 SOUR TestCorpus
+1 GEDC
+2 VERS 5.5.1
+2 FORM Lineage-Linked
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Tomáš /Horák/
+1 SEX M
+0 @I2@ INDI
+1 SEX F
+1 NAME Anna /Horáková/
+0 @I3@ INDI
+1 NAME Pavel /Horák/
+1 SEX M
+1 FAMC @F1@
+2 PEDI birth
+1 FAMC @F2@
+2 PEDI adopted
+0 @I10@ INDI
+1 NAME Eva /Horáková/
+1 SEX F
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I10@
+1 CHIL @I3@
+2 _FREL Natural
+2 _MREL Natural
+0 @F2@ FAM
+1 HUSB @I1@
+1 WIFE @I4@
+1 CHIL @I3@
+1 MARR
+2 DATE 1950
+0 TRLR

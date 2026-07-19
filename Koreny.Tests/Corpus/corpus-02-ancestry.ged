@@ -1,0 +1,36 @@
+0 HEAD
+1 SOUR Ancestry.com Family Trees
+2 VERS 2021.07
+1 GEDC
+2 VERS 5.5.1
+2 FORM Lineage-Linked
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Karel /Dvořák/
+1 SEX M
+1 BIRT
+2 DATE 12 MAY 1880
+2 PLAC Brno
+2 SOUR @S1@
+3 PAGE Kniha narozených, sv. 12, fol. 33
+3 QUAY 3
+3 _APID 1,7602::123456
+1 FAMS @F1@
+0 @I2@ INDI
+1 NAME Aloisie /Dvořáková/
+1 SEX F
+1 FAMS @F1@
+0 @S1@ SOUR
+1 TITL Matrika narozených Brno
+1 AUTH Moravský zemský archiv
+1 REPO @R1@
+0 @R1@ REPO
+1 NAME Moravský zemský archiv v Brně
+0 @O1@ OBJE
+1 FILE portrait-karel.jpg
+2 FORM jpeg
+2 TITL Portrét Karla Dvořáka
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+0 TRLR
