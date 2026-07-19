@@ -640,6 +640,7 @@
 
         _personForm.ApplyTo(ind);
         GedcomSync.SyncIndividual(_doc, ind);
+        _doc.InvalidateLookups();
         _panel = PanelView.None;
         EnsureRootPersonId();
         StateHasChanged();
@@ -660,6 +661,7 @@
             GedcomSync.RemoveIndividualNode(_doc, ind);
         }
 
+        _doc.InvalidateLookups();
         if (_rootPersonId == _editPersonId)
         {
             _rootPersonId = null;
@@ -786,6 +788,7 @@
         _familyForm.ApplyTo(fam);
 
         GedcomSync.SyncFamily(_doc, fam);
+        _doc.InvalidateLookups();
         _panel = PanelView.None;
         StateHasChanged();
     }
@@ -804,6 +807,7 @@
             GedcomSync.RemoveFamilyNode(_doc, fam);
         }
 
+        _doc.InvalidateLookups();
         _panel = PanelView.None;
         StateHasChanged();
     }

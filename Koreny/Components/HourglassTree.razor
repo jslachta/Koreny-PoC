@@ -111,18 +111,18 @@ else
             return;
         }
 
-        _root = FindIndividual(Document, RootPersonId ?? string.Empty);
+        _root = Document.FindIndividual(RootPersonId ?? string.Empty);
         if (_root is null)
         {
             return;
         }
 
         var rootId = _root.Id;
-        var famAsChild = FindFamilyAsChild(Document, rootId);
+        var famAsChild = Document.FindFamilyAsChild(rootId);
         var fatherId = famAsChild?.HusbandId;
         var motherId = famAsChild?.WifeId;
-        var father = FindIndividual(Document, fatherId);
-        var mother = FindIndividual(Document, motherId);
+        var father = Document.FindIndividual(fatherId);
+        var mother = Document.FindIndividual(motherId);
 
         GedcomIndividual? pgf = null;
         GedcomIndividual? pgm = null;
@@ -131,22 +131,22 @@ else
 
         if (father is not null)
         {
-            var ff = FindFamilyAsChild(Document, father.Id);
-            pgf = FindIndividual(Document, ff?.HusbandId);
-            pgm = FindIndividual(Document, ff?.WifeId);
+            var ff = Document.FindFamilyAsChild(father.Id);
+            pgf = Document.FindIndividual(ff?.HusbandId);
+            pgm = Document.FindIndividual(ff?.WifeId);
         }
 
         if (mother is not null)
         {
-            var mf = FindFamilyAsChild(Document, mother.Id);
-            mgf = FindIndividual(Document, mf?.HusbandId);
-            mgm = FindIndividual(Document, mf?.WifeId);
+            var mf = Document.FindFamilyAsChild(mother.Id);
+            mgf = Document.FindIndividual(mf?.HusbandId);
+            mgm = Document.FindIndividual(mf?.WifeId);
         }
 
         var childIds = FindChildrenIds(Document, rootId);
         childIds.Sort(StringComparer.Ordinal);
         var children = childIds
-            .Select(id => FindIndividual(Document, id))
+            .Select(id => Document.FindIndividual(id))
             .Where(c => c is not null)
             .Cast<GedcomIndividual>()
             .ToList();
@@ -555,37 +555,6 @@ else
     private void AddEdge(double x1, double y1, double x2, double y2)
     {
         _segments.Add(new LineSegment { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2 });
-    }
-
-    private static GedcomIndividual? FindIndividual(GedcomDocument doc, string? id)
-    {
-        if (string.IsNullOrEmpty(id))
-        {
-            return null;
-        }
-
-        foreach (var i in doc.Individuals)
-        {
-            if (i.Id == id)
-            {
-                return i;
-            }
-        }
-
-        return null;
-    }
-
-    private static GedcomFamily? FindFamilyAsChild(GedcomDocument doc, string childId)
-    {
-        foreach (var fam in doc.Families)
-        {
-            if (fam.ChildrenIds.Contains(childId))
-            {
-                return fam;
-            }
-        }
-
-        return null;
     }
 
     private static List<string> FindChildrenIds(GedcomDocument doc, string personId)

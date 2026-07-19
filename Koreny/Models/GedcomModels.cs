@@ -15,6 +15,97 @@ public class GedcomDocument
     /// Prázdné u dokumentu vytvořeného od nuly v UI — writer pak hlavičku i TRLR syntetizuje.
     /// </summary>
     public List<GedcomNode> Nodes { get; } = new();
+
+    private Dictionary<string, GedcomIndividual>? _individualById;
+    private Dictionary<string, GedcomFamily>? _familyById;
+    private Dictionary<string, GedcomFamily>? _familyByChildId;
+
+    /// <summary>
+    /// Zneplatní lookup indexy po strukturální změně (přidání/odebrání osoby nebo rodiny,
+    /// změna vazeb HUSB/WIFE/CHIL). Po reparse vzniká nový dokument, takže indexy jsou
+    /// přirozeně čerstvé; volat je třeba jen po editacích ve stejném dokumentu.
+    /// </summary>
+    public void InvalidateLookups()
+    {
+        _individualById = null;
+        _familyById = null;
+        _familyByChildId = null;
+    }
+
+    /// <summary>Osoba podle xref ID; O(1) přes lazy index. Při duplicitních ID vyhrává první (pořadí souboru).</summary>
+    public GedcomIndividual? FindIndividual(string? id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return null;
+        }
+
+        _individualById ??= BuildIndividualById();
+        return _individualById.GetValueOrDefault(id);
+    }
+
+    /// <summary>Rodina podle xref ID; O(1) přes lazy index. Při duplicitních ID vyhrává první (pořadí souboru).</summary>
+    public GedcomFamily? FindFamily(string? id)
+    {
+        if (string.IsNullOrEmpty(id))
+        {
+            return null;
+        }
+
+        _familyById ??= BuildFamilyById();
+        return _familyById.GetValueOrDefault(id);
+    }
+
+    /// <summary>
+    /// První rodina (v pořadí souboru), kde je osoba dítětem — zachovává sémantiku
+    /// „první match" původního lineárního průchodu, jen v O(1) přes lazy index.
+    /// </summary>
+    public GedcomFamily? FindFamilyAsChild(string? childId)
+    {
+        if (string.IsNullOrEmpty(childId))
+        {
+            return null;
+        }
+
+        _familyByChildId ??= BuildFamilyByChildId();
+        return _familyByChildId.GetValueOrDefault(childId);
+    }
+
+    private Dictionary<string, GedcomIndividual> BuildIndividualById()
+    {
+        var d = new Dictionary<string, GedcomIndividual>(Individuals.Count, StringComparer.Ordinal);
+        foreach (var i in Individuals)
+        {
+            d.TryAdd(i.Id, i); // první výskyt vyhrává
+        }
+
+        return d;
+    }
+
+    private Dictionary<string, GedcomFamily> BuildFamilyById()
+    {
+        var d = new Dictionary<string, GedcomFamily>(Families.Count, StringComparer.Ordinal);
+        foreach (var f in Families)
+        {
+            d.TryAdd(f.Id, f);
+        }
+
+        return d;
+    }
+
+    private Dictionary<string, GedcomFamily> BuildFamilyByChildId()
+    {
+        var d = new Dictionary<string, GedcomFamily>(StringComparer.Ordinal);
+        foreach (var f in Families)
+        {
+            foreach (var childId in f.ChildrenIds)
+            {
+                d.TryAdd(childId, f); // první rodina v pořadí souboru vyhrává
+            }
+        }
+
+        return d;
+    }
 }
 
 public class GedcomIndividual

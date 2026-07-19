@@ -37,7 +37,7 @@
             return EmptySvg("No root person selected.");
         }
 
-        if (FindIndividual(document, rootPersonId) is null)
+        if (document.FindIndividual(rootPersonId) is null)
         {
             return EmptySvg("Person not found.");
         }
@@ -273,7 +273,7 @@
 
     private static PersonBox MakeBox(GedcomDocument document, string id, double centerX, double y)
     {
-        var ind = FindIndividual(document, id);
+        var ind = document.FindIndividual(id);
         var name = ind?.FullName ?? id;
         return new PersonBox
         {
@@ -345,19 +345,6 @@
             .Replace(">", "&gt;", StringComparison.Ordinal)
             .Replace("\"", "&quot;", StringComparison.Ordinal)
             .Replace("'", "&apos;", StringComparison.Ordinal);
-    }
-
-    private static GedcomIndividual? FindIndividual(GedcomDocument doc, string id)
-    {
-        foreach (var i in doc.Individuals)
-        {
-            if (i.Id == id)
-            {
-                return i;
-            }
-        }
-
-        return null;
     }
 
     private sealed class DescNode
