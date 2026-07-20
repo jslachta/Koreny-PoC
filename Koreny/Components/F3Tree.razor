@@ -1,0 +1,67 @@
+@using Koreny.Models
+@using Koreny.Services
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* Živý family-chart (f3) strom; nahrazuje statický DescendantTree v overlayi „Celý strom".
+   Pan/zoom je vestavěný v f3. Data mapuje F3DataMapper, interop drží js/f3-view.js. *@
+
+<div id="@_elementId" class="f3" style="width: 100%; height: 100%;"></div>
+
+@code {
+    private readonly string _elementId = $"f3-tree-{Guid.NewGuid():N}";
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<F3Tree>? _selfRef;
+    private bool _initialized;
+
+    [Parameter]
+    public GedcomDocument? Document { get; set; }
+
+    [Parameter]
+    public string? RootPersonId { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnPersonSelected { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || Document is null || Document.Individuals.Count == 0)
+        {
+            return;
+        }
+
+        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/f3-view.js");
+        _selfRef = DotNetObjectReference.Create(this);
+        var json = F3DataMapper.ToJson(Document);
+        await _module.InvokeVoidAsync("init", _elementId, json, RootPersonId, _selfRef);
+        _initialized = true;
+    }
+
+    [JSInvokable]
+    public Task OnPersonClicked(string id) => OnPersonSelected.InvokeAsync(id);
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                if (_initialized)
+                {
+                    await _module.InvokeVoidAsync("destroy", _elementId);
+                }
+
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Okruh je pryč (reload/zavření) — JS strana zmizela i s DOM, není co uklízet.
+        }
+
+        _selfRef?.Dispose();
+        _selfRef = null;
+        _module = null;
+    }
+}
