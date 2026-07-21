@@ -47,7 +47,7 @@
                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
                     <button type="button" @onclick="OpenFullTreeOverlay" disabled="@(_doc is null || string.IsNullOrEmpty(_rootPersonId))">Celý strom</button>
                     <span aria-hidden="true">|</span>
-                    <button type="button" @onclick="OpenFullGraphOverlayAsync" disabled="@(_doc is null)">Celý graf</button>
+                    <button type="button" @onclick="OpenFullGraphOverlay" disabled="@(_doc is null)">Celý graf</button>
                     <span aria-hidden="true">|</span>
                     <button type="button" @onclick="DownloadToolbarSvgAsync" disabled="@(_doc is null)">Stáhnout SVG</button>
                     <span aria-hidden="true">|</span>
@@ -231,21 +231,23 @@
     </div>
 }
 
-@if (_showFullGraphOverlay && !string.IsNullOrEmpty(_fullGraphSvgDataUri))
+@if (_showFullGraphOverlay && _doc is not null)
 {
     <div style="position: fixed; inset: 0; z-index: 1000; background: #fff; outline: none;"
          tabindex="-1"
          @ref="_fullGraphOverlayRef"
          @onkeydown="OnFullGraphKeyDown">
+        @* Tisk zde záměrně není (samostatný follow-up jako u f3 overlaye); toolbar „Tisk" zůstává. *@
         <div style="position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1001; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end;">
             <button type="button" @onclick="DownloadFullGraphSvgAsync">Stáhnout SVG</button>
-            <button type="button" @onclick="PrintFullGraphSvgAsync">Tisk</button>
             <button type="button"
                     @onclick="CloseFullGraphOverlay"
                     aria-label="Zavřít">×</button>
         </div>
-        <div style="position: absolute; inset: 0; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 2.5rem 0.75rem 0.75rem 0.75rem;">
-            <img src="@_fullGraphSvgDataUri" alt="Rodinný graf" style="display: block; max-width: none;" />
+        <div style="position: absolute; inset: 0; padding: 0;">
+            <FullGraphView @ref="_fullGraphView"
+                           Document="@_doc"
+                           OnPersonSelected="OnGraphPersonSelected" />
         </div>
     </div>
 }
@@ -273,10 +275,9 @@
     private F3Tree? _f3Tree;
 
     private bool _showFullGraphOverlay;
-    private string? _fullGraphSvgMarkup;
-    private string? _fullGraphSvgDataUri;
     private ElementReference _fullGraphOverlayRef;
     private bool _pendingFullGraphOverlayFocus;
+    private FullGraphView? _fullGraphView;
 
     private IJSObjectReference? _exportModule;
 
@@ -360,16 +361,13 @@
         }
     }
 
-    private async Task OpenFullGraphOverlayAsync()
+    private void OpenFullGraphOverlay()
     {
-        if (_doc is null)
+        if (_doc is null || _doc.Individuals.Count == 0)
         {
             return;
         }
 
-        var svg = await FullGraph.RenderToSvgAsync(_doc, JSRuntime);
-        _fullGraphSvgMarkup = svg;
-        _fullGraphSvgDataUri = "data:image/svg+xml;base64," + Convert.ToBase64String(Encoding.UTF8.GetBytes(svg));
         _showFullGraphOverlay = true;
         _pendingFullGraphOverlayFocus = true;
     }
@@ -377,30 +375,33 @@
     private void CloseFullGraphOverlay()
     {
         _showFullGraphOverlay = false;
-        _fullGraphSvgMarkup = null;
-        _fullGraphSvgDataUri = null;
     }
 
+    /// <summary>Stáhne celý graf jako samostatné SVG (nezávislé na aktuálním pan/zoom).</summary>
     private async Task DownloadFullGraphSvgAsync()
     {
-        if (string.IsNullOrEmpty(_fullGraphSvgMarkup))
+        if (_fullGraphView is null)
+        {
+            return;
+        }
+
+        var svg = await _fullGraphView.ExportSvgAsync();
+        if (string.IsNullOrEmpty(svg))
         {
             return;
         }
 
         var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("downloadSvg", _fullGraphSvgMarkup, "koreny-export.svg");
+        await module.InvokeVoidAsync("downloadSvg", svg, "koreny-graf.svg");
     }
 
-    private async Task PrintFullGraphSvgAsync()
+    /// <summary>Klik na osobu v grafu: přepne kořen a overlay zavře (stejné chování jako f3 overlay).</summary>
+    private Task OnGraphPersonSelected(string id)
     {
-        if (string.IsNullOrEmpty(_fullGraphSvgMarkup))
-        {
-            return;
-        }
-
-        var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("printSvg", _fullGraphSvgMarkup);
+        _rootPersonId = id;
+        CloseFullGraphOverlay();
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private void OnFullGraphKeyDown(KeyboardEventArgs e)

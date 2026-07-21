@@ -205,6 +205,9 @@
 
         var sb = new StringBuilder();
         sb.Append(CultureInv($"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">"""));
+        // Veškerý obsah je v g.view — na tu skupinu připíná d3.zoom transformaci (graph-view.js),
+        // a z jejího getBBox se počítá export. Bílé pozadí je uvnitř view, aby ho export pokryl.
+        sb.Append("""<g class="view">""");
         sb.Append(CultureInv($"""<rect x="0" y="0" width="{width}" height="{height}" fill="white" />"""));
         sb.Append("""<g fill="none" stroke="#333" stroke-width="1.5">""");
 
@@ -274,12 +277,15 @@
             var cx = left + NODE_WIDTH * 0.5;
             var name = ind.FullName;
             name = string.IsNullOrWhiteSpace(name) ? ind.Id : name;
+            // data-person-id nese surové xref ID; klik na skupinu vrací tuto hodnotu do Blazoru (reroot).
+            sb.Append(CultureInv($"""<g data-person-id="{SvgEscape(ind.Id)}" style="cursor: pointer;">"""));
             sb.Append(CultureInv($"""<rect x="{left}" y="{top}" width="{NODE_WIDTH}" height="{NODE_HEIGHT}" fill="{FillFor(ind)}" stroke="#1a1a1a" />"""));
             sb.Append(CultureInv($"""<text x="{cx}" y="{top + NameLineY}" text-anchor="middle" font-size="13" fill="white">{SvgEscape(Truncate(name))}</text>"""));
             sb.Append(CultureInv($"""<text x="{cx}" y="{top + LifespanLineY}" text-anchor="middle" font-size="13" fill="white">{SvgEscape(FormatLife(ind))}</text>"""));
+            sb.Append("</g>");
         }
 
-        sb.Append("</g></svg>");
+        sb.Append("</g></g></svg>");
         return sb.ToString();
     }
 

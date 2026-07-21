@@ -1,0 +1,86 @@
+0 HEAD
+1 SOUR TestCorpus
+1 GEDC
+2 VERS 5.5.1
+2 FORM Lineage-Linked
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Tomáš /Novák/
+1 SEX M
+1 BIRT
+2 DATE 1920
+0 @I2@ INDI
+1 NAME Marie /Nováková/
+1 SEX F
+1 BIRT
+2 DATE 1923
+0 @I3@ INDI
+1 NAME Petr /Novák/
+1 SEX M
+1 BIRT
+2 DATE 1948
+0 @I4@ INDI
+1 NAME Jana /Nováková/
+1 SEX F
+1 BIRT
+2 DATE 1951
+0 @I5@ INDI
+1 NAME Eva /Svobodová/
+1 SEX F
+1 BIRT
+2 DATE 1950
+0 @I6@ INDI
+1 NAME Lukáš /Novák/
+1 SEX M
+1 BIRT
+2 DATE 1975
+0 @I7@ INDI
+1 NAME Karel /Svoboda/
+1 SEX M
+0 @I8@ INDI
+1 NAME Anna /Svobodová/
+1 SEX F
+0 @I9@ INDI
+1 NAME Josef /Dvořák/
+1 SEX M
+1 BIRT
+2 DATE 1949
+0 @I10@ INDI
+1 NAME Tereza /Dvořáková/
+1 SEX F
+1 BIRT
+2 DATE 1978
+0 @I11@ INDI
+1 NAME Václav /Dvořák/
+1 SEX M
+0 @I12@ INDI
+1 NAME Božena /Dvořáková/
+1 SEX F
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I3@
+1 CHIL @I4@
+1 MARR
+2 DATE 1947
+0 @F2@ FAM
+1 HUSB @I3@
+1 WIFE @I5@
+1 CHIL @I6@
+1 MARR
+2 DATE 1973
+0 @F3@ FAM
+1 HUSB @I7@
+1 WIFE @I8@
+1 CHIL @I5@
+0 @F4@ FAM
+1 HUSB @I9@
+1 WIFE @I4@
+1 CHIL @I10@
+1 MARR
+2 DATE 1976
+0 @F5@ FAM
+1 HUSB @I11@
+1 WIFE @I12@
+1 CHIL @I9@
+0 TRLR
