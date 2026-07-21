@@ -45,13 +45,9 @@
                 </div>
                 <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid #ccc;" />
                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-                    <button type="button" @onclick="OpenFullTreeOverlay" disabled="@(_doc is null || string.IsNullOrEmpty(_rootPersonId))">Celý strom</button>
+                    <button type="button" @onclick="OpenTopolaOverlay" disabled="@(_doc is null || _doc.Individuals.Count == 0)">Zobrazit rodokmen</button>
                     <span aria-hidden="true">|</span>
-                    <button type="button" @onclick="OpenFullGraphOverlay" disabled="@(_doc is null)">Celý graf</button>
-                    <span aria-hidden="true">|</span>
-                    <button type="button" @onclick="DownloadToolbarSvgAsync" disabled="@(_doc is null)">Stáhnout SVG</button>
-                    <span aria-hidden="true">|</span>
-                    <button type="button" @onclick="PrintToolbarSvgAsync" disabled="@(_doc is null)">Tisk</button>
+                    <button type="button" @onclick="StartTreeDownload" disabled="@(_doc is null || _doc.Individuals.Count == 0 || _downloadingTree)">Stáhnout rodokmen</button>
                 </div>
                 <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid #ccc;" />
                 @if (_doc is not null)
@@ -209,46 +205,38 @@
     </div>
 </main>
 
-@if (_showFullTreeOverlay && _doc is not null)
+@if (_showTopolaOverlay && _doc is not null)
 {
     <div style="position: fixed; inset: 0; z-index: 1000; background: #fff; outline: none;"
          tabindex="-1"
-         @ref="_fullTreeOverlayRef"
-         @onkeydown="OnFullTreeKeyDown">
-        @* Tisk zde záměrně není (samostatný follow-up, session 5). *@
+         @ref="_topolaOverlayRef"
+         @onkeydown="OnTopolaKeyDown">
         <div style="position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1001; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end;">
-            <button type="button" @onclick="DownloadFullTreeSvgAsync">Stáhnout SVG</button>
+            <button type="button" @onclick="PrintTreeFromOverlayAsync">Tisk</button>
+            <button type="button" @onclick="DownloadTreeFromOverlayAsync">Stáhnout rodokmen</button>
             <button type="button"
-                    @onclick="CloseFullTreeOverlay"
+                    @onclick="CloseTopolaOverlay"
                     aria-label="Zavřít">×</button>
         </div>
         <div style="position: absolute; inset: 0; padding: 0;">
-            <F3Tree @ref="_f3Tree"
-                    Document="@_doc"
-                    RootPersonId="@_rootPersonId"
-                    OnPersonSelected="OnOverlayPersonSelected" />
+            <TopolaTree @ref="_topolaTree"
+                        Document="@_doc"
+                        RootPersonId="@_rootPersonId"
+                        OnPersonSelected="OnTopolaPersonSelected" />
         </div>
     </div>
 }
 
-@if (_showFullGraphOverlay && _doc is not null)
+@* Stáhnout rodokmen z toolbaru: strom se vyrenderuje mimo obrazovku, po dokončení
+   (OnReady) se exportuje a stáhne, pak se skrytý kontejner odmountuje a uklidí. *@
+@if (_downloadingTree && _doc is not null)
 {
-    <div style="position: fixed; inset: 0; z-index: 1000; background: #fff; outline: none;"
-         tabindex="-1"
-         @ref="_fullGraphOverlayRef"
-         @onkeydown="OnFullGraphKeyDown">
-        @* Tisk zde záměrně není (samostatný follow-up jako u f3 overlaye); toolbar „Tisk" zůstává. *@
-        <div style="position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1001; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end;">
-            <button type="button" @onclick="DownloadFullGraphSvgAsync">Stáhnout SVG</button>
-            <button type="button"
-                    @onclick="CloseFullGraphOverlay"
-                    aria-label="Zavřít">×</button>
-        </div>
-        <div style="position: absolute; inset: 0; padding: 0;">
-            <FullGraphView @ref="_fullGraphView"
-                           Document="@_doc"
-                           OnPersonSelected="OnGraphPersonSelected" />
-        </div>
+    <div style="position: fixed; left: -99999px; top: 0; width: 1280px; height: 800px; overflow: hidden;"
+         aria-hidden="true">
+        <TopolaTree @ref="_hiddenTopolaTree"
+                    Document="@_doc"
+                    RootPersonId="@_rootPersonId"
+                    OnReady="OnHiddenTreeReadyAsync" />
     </div>
 }
 
@@ -269,15 +257,13 @@
     private readonly Dictionary<string, bool> _fChildSel = new(StringComparer.Ordinal);
     private string _pickFamilyId = string.Empty;
 
-    private bool _showFullTreeOverlay;
-    private ElementReference _fullTreeOverlayRef;
-    private bool _pendingFullTreeOverlayFocus;
-    private F3Tree? _f3Tree;
+    private bool _showTopolaOverlay;
+    private ElementReference _topolaOverlayRef;
+    private bool _pendingTopolaOverlayFocus;
+    private TopolaTree? _topolaTree;
 
-    private bool _showFullGraphOverlay;
-    private ElementReference _fullGraphOverlayRef;
-    private bool _pendingFullGraphOverlayFocus;
-    private FullGraphView? _fullGraphView;
+    private bool _downloadingTree;
+    private TopolaTree? _hiddenTopolaTree;
 
     private IJSObjectReference? _exportModule;
 
@@ -297,144 +283,112 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_pendingFullTreeOverlayFocus && _showFullTreeOverlay)
+        if (_pendingTopolaOverlayFocus && _showTopolaOverlay)
         {
-            _pendingFullTreeOverlayFocus = false;
-            await _fullTreeOverlayRef.FocusAsync();
-        }
-
-        if (_pendingFullGraphOverlayFocus && _showFullGraphOverlay)
-        {
-            _pendingFullGraphOverlayFocus = false;
-            await _fullGraphOverlayRef.FocusAsync();
+            _pendingTopolaOverlayFocus = false;
+            await _topolaOverlayRef.FocusAsync();
         }
     }
 
-    private void OpenFullTreeOverlay()
-    {
-        if (_doc is null || string.IsNullOrEmpty(_rootPersonId))
-        {
-            return;
-        }
-
-        _showFullTreeOverlay = true;
-        _pendingFullTreeOverlayFocus = true;
-    }
-
-    private void CloseFullTreeOverlay()
-    {
-        _showFullTreeOverlay = false;
-    }
-
-    /// <summary>Stáhne celý f3 strom jako samostatné SVG (nezávislé na aktuálním pan/zoom).</summary>
-    private async Task DownloadFullTreeSvgAsync()
-    {
-        if (_f3Tree is null)
-        {
-            return;
-        }
-
-        var svg = await _f3Tree.ExportSvgAsync();
-        if (string.IsNullOrEmpty(svg))
-        {
-            return;
-        }
-
-        var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("downloadSvg", svg, "koreny-strom.svg");
-    }
-
-    /// <summary>Klik na osobu v f3 overlayi: přepne kořen a overlay zavře (stejné chování jako klik v HourglassTree).</summary>
-    private Task OnOverlayPersonSelected(string id)
-    {
-        _rootPersonId = id;
-        CloseFullTreeOverlay();
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    private void OnFullTreeKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape")
-        {
-            CloseFullTreeOverlay();
-        }
-    }
-
-    private void OpenFullGraphOverlay()
+    private void OpenTopolaOverlay()
     {
         if (_doc is null || _doc.Individuals.Count == 0)
         {
             return;
         }
 
-        _showFullGraphOverlay = true;
-        _pendingFullGraphOverlayFocus = true;
+        _showTopolaOverlay = true;
+        _pendingTopolaOverlayFocus = true;
     }
 
-    private void CloseFullGraphOverlay()
+    private void CloseTopolaOverlay()
     {
-        _showFullGraphOverlay = false;
+        _showTopolaOverlay = false;
     }
 
-    /// <summary>Stáhne celý graf jako samostatné SVG (nezávislé na aktuálním pan/zoom).</summary>
-    private async Task DownloadFullGraphSvgAsync()
+    /// <summary>Klik na osobu v rodokmenu: přepne kořen a overlay zavře (stejné chování jako klik v HourglassTree).</summary>
+    private Task OnTopolaPersonSelected(string id)
     {
-        if (_fullGraphView is null)
+        _rootPersonId = id;
+        CloseTopolaOverlay();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void OnTopolaKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            CloseTopolaOverlay();
+        }
+    }
+
+    /// <summary>Stáhne celý rodokmen jako samostatné SVG (nezávislé na aktuálním pan/zoom).</summary>
+    private async Task DownloadTreeFromOverlayAsync()
+    {
+        if (_topolaTree is null)
         {
             return;
         }
 
-        var svg = await _fullGraphView.ExportSvgAsync();
+        var svg = await _topolaTree.ExportSvgAsync();
         if (string.IsNullOrEmpty(svg))
         {
             return;
         }
 
         var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("downloadSvg", svg, "koreny-graf.svg");
+        await module.InvokeVoidAsync("downloadSvg", svg, "koreny-rodokmen.svg");
     }
 
-    /// <summary>Klik na osobu v grafu: přepne kořen a overlay zavře (stejné chování jako f3 overlay).</summary>
-    private Task OnGraphPersonSelected(string id)
+    /// <summary>Tisk exportovaného (zoom-resetnutého) SVG — celý strom, ne aktuální výřez.</summary>
+    private async Task PrintTreeFromOverlayAsync()
     {
-        _rootPersonId = id;
-        CloseFullGraphOverlay();
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    private void OnFullGraphKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Escape")
-        {
-            CloseFullGraphOverlay();
-        }
-    }
-
-    /// <summary>Toolbar export kreslí celý graf (FullGraph); potomkovský strom je nyní živá f3 komponenta bez SVG exportu.</summary>
-    private async Task DownloadToolbarSvgAsync()
-    {
-        if (_doc is null)
+        if (_topolaTree is null)
         {
             return;
         }
 
-        var svg = await FullGraph.RenderToSvgAsync(_doc, JSRuntime);
-        var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("downloadSvg", svg, "koreny-export.svg");
-    }
-
-    private async Task PrintToolbarSvgAsync()
-    {
-        if (_doc is null)
+        var svg = await _topolaTree.ExportSvgAsync();
+        if (string.IsNullOrEmpty(svg))
         {
             return;
         }
 
-        var svg = await FullGraph.RenderToSvgAsync(_doc, JSRuntime);
         var module = await GetExportModuleAsync();
         await module.InvokeVoidAsync("printSvg", svg);
+    }
+
+    /// <summary>Stáhnout rodokmen z toolbaru bez otevření overlaye: vyrenderuje skrytý strom (viz markup).</summary>
+    private void StartTreeDownload()
+    {
+        if (_doc is null || _doc.Individuals.Count == 0 || _downloadingTree)
+        {
+            return;
+        }
+
+        _downloadingTree = true; // skrytý TopolaTree se namountuje a po dokončení zavolá OnHiddenTreeReadyAsync
+    }
+
+    private async Task OnHiddenTreeReadyAsync()
+    {
+        try
+        {
+            if (_hiddenTopolaTree is not null)
+            {
+                var svg = await _hiddenTopolaTree.ExportSvgAsync();
+                if (!string.IsNullOrEmpty(svg))
+                {
+                    var module = await GetExportModuleAsync();
+                    await module.InvokeVoidAsync("downloadSvg", svg, "koreny-rodokmen.svg");
+                }
+            }
+        }
+        finally
+        {
+            _downloadingTree = false; // odmountuje skrytý kontejner → DisposeAsync uklidí
+            StateHasChanged();
+        }
     }
 
     private void EnsureRootPersonId()
