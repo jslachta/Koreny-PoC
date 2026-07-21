@@ -215,15 +215,16 @@
          tabindex="-1"
          @ref="_fullTreeOverlayRef"
          @onkeydown="OnFullTreeKeyDown">
-        @* SVG export/tisk zde není: f3 SVG nese zoom transformace a rozměry viewportu,
-           serializace z DOM by exportovala jen aktuální výřez (known limitation, session 4). *@
+        @* Tisk zde záměrně není (samostatný follow-up, session 5). *@
         <div style="position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1001; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end;">
+            <button type="button" @onclick="DownloadFullTreeSvgAsync">Stáhnout SVG</button>
             <button type="button"
                     @onclick="CloseFullTreeOverlay"
                     aria-label="Zavřít">×</button>
         </div>
         <div style="position: absolute; inset: 0; padding: 0;">
-            <F3Tree Document="@_doc"
+            <F3Tree @ref="_f3Tree"
+                    Document="@_doc"
                     RootPersonId="@_rootPersonId"
                     OnPersonSelected="OnOverlayPersonSelected" />
         </div>
@@ -269,6 +270,7 @@
     private bool _showFullTreeOverlay;
     private ElementReference _fullTreeOverlayRef;
     private bool _pendingFullTreeOverlayFocus;
+    private F3Tree? _f3Tree;
 
     private bool _showFullGraphOverlay;
     private string? _fullGraphSvgMarkup;
@@ -321,6 +323,24 @@
     private void CloseFullTreeOverlay()
     {
         _showFullTreeOverlay = false;
+    }
+
+    /// <summary>Stáhne celý f3 strom jako samostatné SVG (nezávislé na aktuálním pan/zoom).</summary>
+    private async Task DownloadFullTreeSvgAsync()
+    {
+        if (_f3Tree is null)
+        {
+            return;
+        }
+
+        var svg = await _f3Tree.ExportSvgAsync();
+        if (string.IsNullOrEmpty(svg))
+        {
+            return;
+        }
+
+        var module = await GetExportModuleAsync();
+        await module.InvokeVoidAsync("downloadSvg", svg, "koreny-strom.svg");
     }
 
     /// <summary>Klik na osobu v f3 overlayi: přepne kořen a overlay zavře (stejné chování jako klik v HourglassTree).</summary>

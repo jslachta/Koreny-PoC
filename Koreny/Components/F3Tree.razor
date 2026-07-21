@@ -41,6 +41,17 @@
     [JSInvokable]
     public Task OnPersonClicked(string id) => OnPersonSelected.InvokeAsync(id);
 
+    /// <summary>Samostatné SVG celého stromu (nezávislé na pan/zoom); null, dokud strom nestojí.</summary>
+    public async Task<string?> ExportSvgAsync()
+    {
+        if (_module is null || !_initialized)
+        {
+            return null;
+        }
+
+        return await _module.InvokeAsync<string>("exportSvg", _elementId);
+    }
+
     public async ValueTask DisposeAsync()
     {
         try
