@@ -8,7 +8,8 @@
  * Klik na kartu volá dotNetRef.invokeMethodAsync("OnPersonClicked", id).
  */
 
-const EXPORT_PADDING = 20;
+import { exportSvgString } from "./svg-export.js";
+
 const F3_CSS_URL = "lib/family-chart/family-chart.css";
 
 /** @type {Map<string, { chart: object, dotNetRef: object }>} */
@@ -76,18 +77,11 @@ export function destroy(elementId) {
 }
 
 /**
- * Export celého stromu jako samostatný SVG string, nezávislý na aktuálním
- * pan/zoom stavu. Originální DOM se nemění — pracuje se s klonem.
- *
- * Poznámky k implementaci (viz docs/session-5-vysledky.md):
- * - zoom drží f3 jako INLINE CSS `style="transform: …"` na g.view (ne SVG atribut),
- *   reset v klonu tedy maže style.transform;
- * - bounding box se čte getBBox() nad g.view ORIGINÁLU (klon mimo DOM getBBox
- *   neumí); getBBox ignoruje vlastní CSS transform elementu, takže vrací
- *   nezoomované souřadnice obsahu — přesně to, co export potřebuje;
- * - f3 CSS se načítá fetch-em z vendorovaného souboru (jediný zdroj pravdy)
- *   a vkládá do <style> v klonu; klonu se přidává třída "f3", aby selektory
- *   `.f3 …` platily i bez původního rodičovského divu.
+ * Export celého stromu jako samostatný SVG string, nezávislý na aktuálním pan/zoom.
+ * Klon/reset-zoom/bbox/serializace řeší sdílený svg-export.js; f3-specifická je jen
+ * injektáž vendorovaného f3 CSS (fetch, jediný zdroj pravdy) a třída "f3" na kořeni,
+ * aby `.f3 …` selektory platily i mimo původní rodičovský div (karty f3 se stylují CSS,
+ * ne inline atributy — na rozdíl od FullGraphu).
  *
  * @param {string} elementId id kontejneru předaný do init
  * @returns {Promise<string>} serializované SVG
@@ -95,36 +89,17 @@ export function destroy(elementId) {
 export async function exportSvg(elementId) {
   const container = document.getElementById(elementId);
   const svg = container ? container.querySelector("svg.main_svg") : null;
-  const view = svg ? svg.querySelector("g.view") : null;
-  if (!svg || !view) {
+  if (!svg) {
     throw new Error(`KorenyF3.exportSvg: strom v elementu '${elementId}' nenalezen`);
   }
-
-  const bbox = view.getBBox();
-
-  const clone = svg.cloneNode(true);
-  const cloneView = clone.querySelector("g.view");
-  cloneView.style.transform = "";
-  cloneView.removeAttribute("transform");
-
-  clone.classList.add("f3");
-  const w = bbox.width + 2 * EXPORT_PADDING;
-  const h = bbox.height + 2 * EXPORT_PADDING;
-  clone.setAttribute("viewBox", `${bbox.x - EXPORT_PADDING} ${bbox.y - EXPORT_PADDING} ${w} ${h}`);
-  clone.setAttribute("width", String(w));
-  clone.setAttribute("height", String(h));
-  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
 
   const cssResponse = await fetch(F3_CSS_URL);
   if (!cssResponse.ok) {
     throw new Error(`KorenyF3.exportSvg: nelze načíst ${F3_CSS_URL} (${cssResponse.status})`);
   }
 
-  const styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
-  styleEl.textContent = await cssResponse.text();
-  clone.insertBefore(styleEl, clone.firstChild);
-
-  return new XMLSerializer().serializeToString(clone);
+  const cssText = await cssResponse.text();
+  return exportSvgString(svg, { viewSelector: "g.view", cssText, rootClass: "f3" });
 }
 
 /** card_display dostává TreeDatum i Datum podle kontextu — sáhni na osobní data oběma cestami. */
