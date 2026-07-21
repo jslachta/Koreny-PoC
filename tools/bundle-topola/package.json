@@ -1,0 +1,15 @@
+{
+  "name": "koreny-bundle-topola",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Author-time bundler for the vendored Topola (PeWu/topola) IIFE. Not part of the app build; the app runs from the committed lib/topola/topola.bundle.js.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "topola": "3.10.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0"
+  }
+}

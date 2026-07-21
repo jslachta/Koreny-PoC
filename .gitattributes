@@ -1,0 +1,3 @@
+# Vendored Topola bundle is hash-documented (lib/topola/README.md); keep its bytes
+# verbatim (LF, no autocrlf) so the committed file matches the recorded sha256.
+Koreny/wwwroot/lib/topola/topola.bundle.js -text
