@@ -1,81 +1,116 @@
-# Session 6: FullGraph jako živý pohled — výsledky
+# Session 6 (Topola): jediný rodokmen na knihovně Topola — výsledky
 
-Datum: 2026-07-21. Cíl: povýšit overlay „Celý graf" na plnohodnotný živý pohled — SVG místo
-`<img>`, pan/zoom, klik na osobu, SVG export celého grafu. Layout (Dagre + virtuální rodinné
-uzly) se nemění. Větev `renderer-cheap-fixes`, vstupní strom čistý.
+Datum: 2026-07-21. Cíl: jediný plný pohled na rodokmen postavený na Topole (PeWu/topola,
+Relatives chart); odstranit f3 overlay i FullGraph. HourglassTree beze změny. Větev
+`renderer-cheap-fixes`.
 
-## Rozhodnutí: innerHTML vs. MarkupString
+> Tento dokument nahrazuje předchozí (FullGraph) session-6 — ta funkce je touto session
+> odstraněna; její záznam zůstává v git historii (commit „live FullGraph overlay").
 
-Živé SVG se vkládá **interop innerHTML** (JS `container.innerHTML = svgString` v graph-view.js),
-ne Blazor `MarkupString`. Zdůvodnění: JS modul má vlastnit celý SVG podstrom (připíná na něj
-d3.zoom listener a delegovaný click handler). S `MarkupString` by SVG bylo součástí Blazor
-render stromu a **re-render Index.razor by mohl podstrom přepsat a shodit d3 handlery**;
-navíc by Blazor zbytečně diffoval velké cizí SVG. innerHTML dává čistý model vlastnictví
-(stejný jako f3-view.js): Blazor drží jen prázdný `<div>`, JS plní i uklízí jeho obsah.
+## Bod 0 — proveditelnost (schváleno review: možnost 1, autorský esbuild bundle)
 
-## Co vzniklo / změnilo se
+- **Distribuce:** topola 3.10.3 je z npm **jen CommonJS** — žádný UMD/IIFE pro `<script>`,
+  žádné ESM; jsdelivr `/+esm` externalizuje deps na živé CDN URL. Proto je nutný jednorázový
+  **autorský bundling** (esbuild), schválený review.
+- **d3:** topola potřebuje d3-array/hierarchy/selection/transition@3 (jsou v d3 7 umbrella)
+  + d3-flextree@2 a parse-gedcom (mimo umbrella). Vše je **inlinované v bundlu**; vendorované
+  d3 7.9.0 zůstává zvlášť pro d3.zoom (topola zoom nemá).
+- **API:** `createChart({ json, chartType: RelativesChart, renderer: DetailedRenderer, startIndi })`;
+  klik → `indiCallback(info)`; zoom/pan si připínáme sami. Vstup `JsonGedcomData { indis, fams }`.
 
-| Soubor | Změna |
-|---|---|
-| `Koreny/wwwroot/js/svg-export.js` | **nový** — sdílená `exportSvgString(svg, {viewSelector, cssText, rootClass})`: klon, reset zoom transformace (maže `style.transform` i atribut), bbox z originálního `g.view`, viewBox + 20 px padding, volitelná injektáž `<style>`, serializace |
-| `Koreny/wwwroot/js/f3-view.js` | `exportSvg` přepsán na sdílenou funkci (fetch f3 CSS + `rootClass:"f3"` zůstává f3-specifický); duplicitní logika odstraněna |
-| `Koreny/wwwroot/js/graph-view.js` | **nový** — `KorenyGraph {init, destroy, exportSvg}`: innerHTML, d3.zoom na `g.view`, delegovaný klik na `g[data-person-id]` → `OnPersonClicked`; export bez CSS injektáže |
-| `Koreny/Components/FullGraph.razor` | generátor: obsah obalen do `<g class="view">`, bílé pozadí přesunuto dovnitř view, každá osoba dostala `<g data-person-id="…">` (jediné změny generátoru; layout beze změny) |
-| `Koreny/Components/FullGraphView.razor` | **nová** komponenta (lifecycle dle F3Tree): OnAfterRender → FullGraph SVG + `init`, `ExportSvgAsync`, `DisposeAsync` s úklidem interop reference |
-| `Koreny/Pages/Index.razor` | overlay „Celý graf": `<img>` base64 → živý `FullGraphView`; klik přeroootuje HourglassTree a zavře overlay; „Stáhnout SVG" přes `ExportSvgAsync` → `downloadSvg` (`koreny-graf.svg`) |
-| `Koreny.Tests/Corpus/corpus-07-fullgraph.ged` | **nový** — 12 osob / 5 rodin, 2 přivdané osoby (Eva, Josef) s vlastními rodiči (vedlejší větve F3, F5) |
+## Verze a licence
 
-**Ověřeno k zadání:** FullGraph se styluje **inline atributy** (`fill`, `stroke`, `font-size`) —
-zjištěno čtením generátoru; proto export grafu **nepotřebuje žádnou CSS injektáž**. f3 cesta
-naopak CSS vkládá (karty se stylují třídami). Sdílená funkce to řeší parametrem `cssText`
-(f3 předá, graph ne). Jeden mechanismus, dva konzumenti.
+| Balíček | Verze (pinovaná) | Licence | Umístění |
+|---|---|---|---|
+| topola | **3.10.3** | **Apache-2.0** | `Koreny/wwwroot/lib/topola/` (bundle + LICENSE + README) |
+| d3 | 7.9.0 (zůstává) | ISC | `Koreny/wwwroot/lib/d3/` |
 
-Bílé pozadí je nově **uvnitř `g.view`** (nezoomuje se vůči obsahu), takže ho export pokryje
-(bbox z `g.view` ho zahrne) — dark-mode SVG prohlížeče by jinak zobrazily tmavé linky na
-tmavém pozadí.
+Bundling: `tools/bundle-topola/` (package.json + package-lock pinují topola 3.10.3, `build.mjs`
+= esbuild IIFE, global `topola`, deps inlinované). Autorský krok (`npm ci && npm run build`),
+**ne** součást `dotnet run` — aplikace běží z committed `topola.bundle.js`. README nese verzi,
+dva příkazy na přegenerování a sha256 bundlu; `.gitattributes` drží bundle v LF, aby hash seděl.
 
 ## Stav testů
 
-**30 zelených / 31** (1 skip — ANSEL placeholder), beze změny (JS/markup + nový korpusový
-soubor; C# testová plocha se nezměnila). `dotnet build` 0 warnings.
+**31 zelených / 32** (1 skip — ANSEL placeholder). `dotnet build` 0 warnings.
+GEDCOM testová sada (round-trip, idempotence, parser) **nedotčená a zelená**. Přibylo
+**6 TopolaDataMapperTests**, ubylo 5 F3DataMapperTests (f3 odstraněn).
+
+## Mapování dat (TopolaDataMapper)
+
+Family-based, near 1:1 z GEDCOM: `indis` (id, firstName, lastName, sex, famc, fams, birth/death
+year), `fams` (id, husb, wife, children, marriage). `famc` = PRVNÍ rodina, kde je osoba dítětem
+(Topola má famc jen jako jediný string); `fams` = všechny rodiny osoby; odkazy na neexistující
+ID se vynechávají; osoby bez vazeb zůstávají. Testy: corpus-05 dvě manželství (oba fams, děti po
+rodinách), FAMC×2 → první rodina, corpus-07 přivdaná osoba drží vlastní famc+fams, corpus-03 bez
+vazeb, dangling reference, JSON klíče.
+
+## Commity
+
+| Commit | Obsah |
+|---|---|
+| `e8aa625` BUILD: vendor Topola 3.10.3 … | tools/bundle-topola + lib/topola bundle + LICENSE/README + .gitattributes |
+| `92b805c` FEATURE: TopolaDataMapper … | mapper + 6 testů |
+| `d2c1704` FEATURE: Topola family tree view … | topola-view.js, TopolaTree.razor, Index.razor toolbar/overlay, index.html |
+| `a63658d` CLEANUP: remove family-chart (f3) | F3Tree, f3-view.js, F3DataMapper+testy, lib/family-chart (commit A) |
+| `8ca5234` CLEANUP: remove FullGraph + Dagre | FullGraph(+View), graph-view.js, dagre-layout.js, lib/dagre (commit B) |
+| (tento) DOCS: session 6 (Topola) | tento dokument + corpus-08-potter.ged |
+
+Sdílený `svg-export.js` (klon/reset/bbox) zůstává — Topola cesta ho používá (viz zadání:
+přesunout před smazáním f3-view.js; byl vyčleněn už v předchozí session).
+
+## UI
+
+Toolbar: odstraněno „Celý strom", „Celý graf", „Stáhnout SVG", „Tisk"; přidáno **„Zobrazit
+rodokmen"** (overlay s Topolou, root = aktuální osoba) a **„Stáhnout rodokmen"** (bez overlaye:
+skrytý off-screen render → `OnReady` → export → downloadSvg → odmountuje a uklidí; skrytý
+rendering se ukázal spolehlivý, fallback nebyl potřeba). V overlayi **„Tisk"** (printSvg nad
+zoom-resetnutým exportem) a **„Stáhnout rodokmen"**. Klik na osobu přeroootuje HourglassTree a
+zavře overlay.
 
 ## Manuální checklist
 
-Prostředí: `dotnet run` + Browser pane, `corpus-07-fullgraph.ged` nahraný přes file input.
+Prostředí: `dotnet run` + Browser pane; `corpus-07-fullgraph.ged` a `corpus-08-potter.ged`.
 
-- [x] **Všechny osoby včetně přivdaných a jejich rodičů viditelné** — 12 skupin
-  `g[data-person-id]`: obě přivdané osoby (Eva Svobodová, Josef Dvořák) i jejich rodiče
-  (Karel + Anna Svoboda, Václav + Božena Dvořák) přítomni; 5 rodinných uzlů (kroužků).
-- [x] **Linky rodič→rodina→dítě viditelné** — 16 `path` linků (přesně: 5 rodin × 2 rodiče +
-  6 dětských hran), stroke rgb(51,51,51).
-- [x] **Pan/zoom** — d3.zoom na `g.view`: wheel změnil `transform` na `scale(1.52)`, drag
-  posunul translaci; kurzor `grab`, SVG vyplňuje kontejner (100 %×100 %).
-- [x] **Klik přerootuje** — klik na box Evy Svobodové (přivdaná, `data-person-id="I5"`)
-  zavřel overlay a HourglassTree se přerootoval na Evu (rodiče Karel+Anna nad ní, dítě
-  Lukáš pod ní).
-- [x] **Export při zazoomování = celý graf** — po wheel zoomu + pan exportováno reálným
-  tlačítkem i modulem: `viewBox="-20 -20 1348 592"` = plné bounds obsahu (1308×552 + 2×20 px),
-  nezávisle na viewportu; všech 12 osob, `g.view` bez transformace, bílé pozadí, bez `<style>`;
-  export 3× po sobě **byte-identický**. Samostatné otevření jako `image/svg+xml` (blob URL,
-  izolovaný dokument): barvy boxů (#4A7FB5 muži / #9B2335 ženy), bílý text, 16 linků.
-- [x] **5× otevřít/zavřít bez chyb** — všech 5 cyklů otevřelo (12 osob) i zavřelo; konzole
-  po celé seanci **bez jediné chyby** (žádný leak DotNetObjectReference).
-- [x] Offline: `performance.getEntriesByType('resource')` — **0 požadavků mimo localhost**
-  (d3, graph-view.js, svg-export.js lokálně).
-
-Overlay po exportu dál pan/zoomoval a reagoval na klik (export pracuje s klonem, originál
-nedotčen).
+- [x] **Vedlejší větve viditelné** — corpus-07 root Lukáš: teta Jana, sestřenice Tereza
+  (potomci předků) i rodiče přivdané matky Evy (Karel+Anna) zobrazeni.
+- [x] **Vícenásobná manželství: děti u správných partnerů** — Potter, root Vernon (I8, dvě
+  rodiny): obě manželky (Petunia, Marjorie) i obě děti; **Dudley u Petunie, Victor u Marjorie**
+  (ověřeno x-souřadnicemi). Pozn.: RelativesChart ukazuje více manželství, když je multi-ženatá
+  osoba KOŘENEM (`additionalMarriage`); z pohledu potomka se druhý sňatek rodiče nezobrazí —
+  sémantika RelativesChart, ne vada.
+- [x] **Karty se nepřekrývají** — 0 překryvů z 36 párů uzlů (flextree layout).
+- [x] **Linky viditelné** — Topola kreslí spojnice mezi kartami.
+- [x] **Pan/zoom** — d3.zoom na `g.view`: wheel mění scale, drag translaci.
+- [x] **Klik přerootuje HourglassTree a zavře overlay** — klik na Janu → overlay zmizel,
+  HourglassTree ukazuje Janu s rodiči a dítětem.
+- [x] **„Stáhnout rodokmen" z toolbaru i z overlaye při zazoomování → celý strom** — export
+  je `<svg>` s celým stromem (viewBox z bbox obsahu, ne výřez), self-styled (embedded topola
+  `<style>`), deterministický 3× po sobě; toolbar varianta bez otevření overlaye.
+- [x] **Tisk: náhled obsahuje celý strom** — printSvg vloží do print-rootu tentýž zoom-resetnutý
+  export (celý strom), ne aktuální výřez.
+- [x] **5× otevřít/zavřít bez chyb** — 5 cyklů OK, konzole čistá.
+- [x] **Offline** — 0 požadavků mimo localhost (topola bundle, d3, svg-export lokálně).
 
 ## Odchylky od zadání
 
-1. **Tlačítko „Tisk" z overlaye „Celý graf" odstraněno** (zůstalo jen „Stáhnout SVG" + zavřít).
-   Staré overlay-Tisk používalo statický SVG string, který živá cesta už negeneruje; task
-   zmiňuje pro tuto session jen SVG export. Tisk zůstává dostupný z **hlavního toolbaru**
-   („Tisk" přes `FullGraph.RenderToSvgAsync`), takže se schopnost neztrácí. Konzistentní
-   s f3 overlayem (session 5). Případný tisk přímo z overlaye je samostatný follow-up.
-2. **Screenshot nešel** (Browser pane trvale `hidden`, screenshoty timeoutují — jako
-   v session 5). Vizuální verifikace provedena DOM inspekcí + computed styles v živém
-   overlayi i v samostatném exportovaném dokumentu.
+1. **Node.js nebyl na stroji nainstalovaný.** Autorský esbuild krok jsem spustil přes
+   **přenosný Node 20.18.1** stažený do scratchpadu (necommituje se). `tools/bundle-topola`
+   i tak vyžaduje Node k přegenerování bundlu (README to uvádí) — to je vlastnost možnosti 1
+   schválené review, ne odchylka od ní.
+2. **Vícenásobné manželství se v Relatives chartu ukazuje jen z kořene multi-ženaté osoby**
+   (viz checklist). Ověřeno rootem na Vernona; z pohledu potomka topola druhý sňatek rodiče
+   nekreslí. Sémantika knihovny.
+3. **FAMC×2 (adopce) → jen první rodičovská vazba** (Topola má famc jediný string) — known
+   limitation, zafixováno testem 1b.
+4. **Přepis předchozího session-6 dokumentu** (FullGraph) — ta funkce je odstraněna; historie
+   zůstává v gitu.
+5. **Screenshoty v skrytém Browser pane timeoutují** (jako v session 5/6) — vizuální verifikace
+   provedena DOM inspekcí, computed styles a měřením souřadnic karet.
+6. `corpus-07-fullgraph.ged` má legacy název (z FullGraph session), ale je to platný korpus
+   používaný TopolaDataMapperTests; existující korpus jsem neměnil, `corpus-08-potter.ged` je nový.
 
-Jiné odchylky: žádné. Osud f3 overlaye („Celý strom") jsem dle zadání neřešil — zůstává beze
-změny (jen jeho export sdílí nově vyčleněnou `exportSvgString`, chování identické).
+## Known limitations
+
+- Adopce (dítě ve dvou rodinách) se zobrazí jako jediná rodičovská vazba (viz odchylka 3).
+- Topola bundle je generovaný artefakt; jeho přegenerování vyžaduje Node/esbuild (autorský krok).

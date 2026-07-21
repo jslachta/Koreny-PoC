@@ -1,0 +1,94 @@
+0 HEAD
+1 SOUR TestCorpus
+1 GEDC
+2 VERS 5.5.1
+2 FORM Lineage-Linked
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME James /Potter/
+1 SEX M
+1 BIRT
+2 DATE 1960
+0 @I2@ INDI
+1 NAME Lily /Potter/
+1 SEX F
+1 BIRT
+2 DATE 1960
+0 @I3@ INDI
+1 NAME Harry /Potter/
+1 SEX M
+1 BIRT
+2 DATE 1980
+0 @I4@ INDI
+1 NAME Ginny /Potter/
+1 SEX F
+1 BIRT
+2 DATE 1981
+0 @I5@ INDI
+1 NAME James Sirius /Potter/
+1 SEX M
+0 @I6@ INDI
+1 NAME Albus /Potter/
+1 SEX M
+0 @I7@ INDI
+1 NAME Petunia /Dursley/
+1 SEX F
+0 @I8@ INDI
+1 NAME Vernon /Dursley/
+1 SEX M
+0 @I9@ INDI
+1 NAME Dudley /Dursley/
+1 SEX M
+0 @I10@ INDI
+1 NAME Marjorie /Vaux/
+1 SEX F
+0 @I11@ INDI
+1 NAME Victor /Dursley/
+1 SEX M
+0 @I12@ INDI
+1 NAME Harold /Evans/
+1 SEX M
+0 @I13@ INDI
+1 NAME Rose /Evans/
+1 SEX F
+0 @I14@ INDI
+1 NAME Arthur /Weasley/
+1 SEX M
+0 @I15@ INDI
+1 NAME Molly /Weasley/
+1 SEX F
+0 @I16@ INDI
+1 NAME Ron /Weasley/
+1 SEX M
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I3@
+1 MARR
+2 DATE 1979
+0 @F2@ FAM
+1 HUSB @I3@
+1 WIFE @I4@
+1 CHIL @I5@
+1 CHIL @I6@
+1 MARR
+2 DATE 2005
+0 @F3@ FAM
+1 HUSB @I8@
+1 WIFE @I7@
+1 CHIL @I9@
+0 @F4@ FAM
+1 HUSB @I8@
+1 WIFE @I10@
+1 CHIL @I11@
+0 @F10@ FAM
+1 HUSB @I12@
+1 WIFE @I13@
+1 CHIL @I2@
+1 CHIL @I7@
+0 @F11@ FAM
+1 HUSB @I14@
+1 WIFE @I15@
+1 CHIL @I4@
+1 CHIL @I16@
+0 TRLR
