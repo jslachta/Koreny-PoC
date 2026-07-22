@@ -1,0 +1,147 @@
+0 HEAD
+1 SOUR Koreny
+1 GEDC
+2 VERS 5.5.1
+2 FORM Lineage-Linked
+1 CHAR UTF-8
+1 LANG Czech
+0 @I1@ INDI
+1 NAME František /Novák/
+1 SEX M
+1 BIRT
+2 DATE 3 MAR 1901
+2 PLAC Kutná Hora
+1 DEAT
+2 DATE 12 JUN 1978
+2 PLAC Praha
+1 NOTE Zakladatel rodu, narozen v Kutné Hoře.
+2 CONT Vyučil se kovářem, později hospodařil na rodinném statku.
+2 CONT Oženil se dvakrát; z obou manželství měl potomky.
+0 @I2@ INDI
+1 NAME Marie /Nováková/
+1 SEX F
+1 BIRT
+2 DATE 14 JUL 1905
+2 PLAC Čáslav
+1 DEAT
+2 DATE 2 FEB 1969
+0 @I3@ INDI
+1 NAME Josef /Novák/
+1 SEX M
+1 BIRT
+2 DATE 20 DEC 1928
+2 PLAC Praha
+1 DEAT
+2 DATE 5 JAN 1995
+0 @I4@ INDI
+1 NAME Anna /Horáková/
+1 SEX F
+1 BIRT
+2 DATE 8 SEP 1931
+2 PLAC Praha
+0 @I5@ INDI
+1 NAME Ludmila /Nováková/
+1 SEX F
+1 BIRT
+2 DATE 11 NOV 1910
+2 PLAC Tábor
+0 @I6@ INDI
+1 NAME Petr /Novák/
+1 SEX M
+1 BIRT
+2 DATE 25 APR 1940
+2 PLAC Tábor
+0 @I7@ INDI
+1 NAME Věra /Nováková/
+1 SEX F
+1 BIRT
+2 DATE 17 MAY 1930
+2 PLAC Brno
+0 @I8@ INDI
+1 NAME Jana /Nováková/
+1 SEX F
+1 BIRT
+2 DATE 3 JUN 1955
+2 PLAC Praha
+0 @I9@ INDI
+1 NAME Tomáš /Novák/
+1 SEX M
+1 BIRT
+2 DATE 29 AUG 1958
+2 PLAC Praha
+0 @I10@ INDI
+1 NAME Karel /Svoboda/
+1 SEX M
+1 BIRT
+2 DATE 1 JAN 1902
+0 @I11@ INDI
+1 NAME Božena /Svobodová/
+1 SEX F
+1 BIRT
+2 DATE 16 OCT 1906
+0 @I12@ INDI
+1 NAME Jan /Horák/
+1 SEX M
+1 BIRT
+2 DATE 7 FEB 1927
+0 @I13@ INDI
+1 NAME Eva /Horáková/
+1 SEX F
+1 BIRT
+2 DATE 21 MAR 1960
+2 PLAC Plzeň
+0 @I14@ INDI
+1 NAME Hana /Nováková/
+1 SEX F
+1 BIRT
+2 DATE 30 JUL 1943
+0 @I15@ INDI
+1 NAME Lukáš /Novák/
+1 SEX M
+1 BIRT
+2 DATE 4 DEC 1968
+2 PLAC Tábor
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I3@
+1 CHIL @I4@
+1 MARR
+2 DATE 18 MAY 1927
+2 PLAC Praha
+0 @F2@ FAM
+1 HUSB @I1@
+1 WIFE @I5@
+1 CHIL @I6@
+1 MARR
+2 DATE 9 SEP 1939
+2 PLAC Tábor
+0 @F3@ FAM
+1 HUSB @I3@
+1 WIFE @I7@
+1 CHIL @I8@
+1 CHIL @I9@
+1 MARR
+2 DATE 12 JUN 1954
+2 PLAC Praha
+0 @F4@ FAM
+1 HUSB @I10@
+1 WIFE @I11@
+1 CHIL @I7@
+1 MARR
+2 DATE 24 APR 1929
+0 @F5@ FAM
+1 HUSB @I12@
+1 WIFE @I4@
+1 CHIL @I13@
+1 MARR
+2 DATE 3 OCT 1959
+2 PLAC Praha
+0 @F6@ FAM
+1 HUSB @I6@
+1 WIFE @I14@
+1 CHIL @I15@
+1 MARR
+2 DATE 15 AUG 1967
+2 PLAC Tábor
+0 TRLR
