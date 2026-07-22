@@ -41,6 +41,8 @@
                     <InputFile id="gedcomInput" OnChange="OnFileSelectedAsync" style="display:none" accept=".ged" />
                     <button type="button" onclick="document.getElementById('gedcomInput').click()">Načíst GEDCOM</button>
                     <span aria-hidden="true">|</span>
+                    <button type="button" @onclick="LoadSampleGedcomAsync">Načíst vzorový GEDCOM</button>
+                    <span aria-hidden="true">|</span>
                     <button type="button" @onclick="ExportGedcomAsync" disabled="@(_doc is null)">Uložit GEDCOM</button>
                 </div>
                 <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid #ccc;" />
@@ -91,18 +93,26 @@
                             </div>
                             <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid #ccc;" />
                         }
-                        <p style="margin-top: 0; flex-shrink: 0;">Vyberte osobu nebo přidejte novou.</p>
+                        <p style="margin-top: 0; flex-shrink: 0;" role="status">@SelectedPersonStatus()</p>
                         <div style="flex: 1; min-height: 0; overflow: auto;">
                             @if (_doc is not null)
                             {
                                 @foreach (var p in GetIndividualsSorted())
                                 {
                                     var rowId = p.Id;
-                                    <button type="button"
-                                            @onclick="@(() => OnPersonListRowClicked(rowId))"
-                                            style="display: block; width: 100%; text-align: left; margin-bottom: 0.35rem; cursor: pointer;">
-                                        @p.FullName — @FormatLifespanYears(p)
-                                    </button>
+                                    var selected = rowId == _rootPersonId;
+                                    <div style="display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.35rem; padding: 0.15rem 0.35rem; border-radius: 4px; background: @(selected ? "#cfe3ff" : "transparent");">
+                                        <button type="button"
+                                                @onclick="@(() => SelectPerson(rowId))"
+                                                aria-pressed="@(selected ? "true" : "false")"
+                                                style="flex: 1; text-align: left; cursor: pointer; background: transparent; border: none; font: inherit; padding: 0.1rem 0; @(selected ? "font-weight: 600;" : "")">
+                                            @p.FullName — @FormatLifespanYears(p)
+                                        </button>
+                                        @if (selected)
+                                        {
+                                            <button type="button" @onclick="@(() => OpenPersonForEdit(rowId))" title="Upravit vybranou osobu">Upravit</button>
+                                        }
+                                    </div>
                                 }
                             }
                         </div>
@@ -244,6 +254,7 @@
     private GedcomDocument? _doc;
     private string? _loadError;
     private string? _rootPersonId;
+    private bool _dirty; // neuložené editace od posledního načtení/exportu
 
     private PanelView _panel = PanelView.None;
     private bool _personIsNew;
@@ -497,11 +508,26 @@
         return Task.CompletedTask;
     }
 
-    private void OnPersonListRowClicked(string id)
+    /// <summary>Klik na řádek seznamu = výběr osoby (řídí HourglassTree i akce rodokmenu). Bez toggle, bez otevření editoru.</summary>
+    private void SelectPerson(string id)
     {
         _rootPersonId = id;
-        OpenPersonForEdit(id);
         StateHasChanged();
+    }
+
+    private string SelectedPersonStatus()
+    {
+        if (_doc is null || _doc.Individuals.Count == 0)
+        {
+            return "Vyberte osobu nebo přidejte novou.";
+        }
+
+        var sel = string.IsNullOrEmpty(_rootPersonId)
+            ? null
+            : _doc.Individuals.FirstOrDefault(x => x.Id == _rootPersonId);
+        return sel is null
+            ? "Vyberte osobu v seznamu."
+            : $"Vybraná osoba: {sel.FullName}";
     }
 
     private IEnumerable<GedcomIndividual> GetIndividualsSorted()
@@ -592,6 +618,7 @@
         _personForm.ApplyTo(ind);
         GedcomSync.SyncIndividual(_doc, ind);
         _doc.InvalidateLookups();
+        _dirty = true;
         _panel = PanelView.None;
         EnsureRootPersonId();
         StateHasChanged();
@@ -613,6 +640,7 @@
         }
 
         _doc.InvalidateLookups();
+        _dirty = true;
         if (_rootPersonId == _editPersonId)
         {
             _rootPersonId = null;
@@ -740,6 +768,7 @@
 
         GedcomSync.SyncFamily(_doc, fam);
         _doc.InvalidateLookups();
+        _dirty = true;
         _panel = PanelView.None;
         StateHasChanged();
     }
@@ -759,6 +788,7 @@
         }
 
         _doc.InvalidateLookups();
+        _dirty = true;
         _panel = PanelView.None;
         StateHasChanged();
     }
@@ -810,16 +840,48 @@
             await using var stream = file.OpenReadStream(maxAllowedSize: 50_000_000);
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var text = await reader.ReadToEndAsync();
-            AppState.Document = Parser.Parse(text);
-            _doc = AppState.Document;
-            _panel = PanelView.None;
-            EnsureRootPersonId();
-            StateHasChanged();
+            LoadGedcomText(text);
         }
         catch (Exception ex)
         {
             _loadError = ex.Message;
         }
+    }
+
+    /// <summary>Načtení vzorového GEDCOMu z embedded resource — toutéž cestou parseru jako upload.</summary>
+    private async Task LoadSampleGedcomAsync()
+    {
+        if (_dirty)
+        {
+            var proceed = await JSRuntime.InvokeAsync<bool>(
+                "confirm",
+                "Nahraný dokument má neuložené změny. Načtením vzorového GEDCOMu se přepíší. Pokračovat?");
+            if (!proceed)
+            {
+                return;
+            }
+        }
+
+        _loadError = null;
+        try
+        {
+            LoadGedcomText(SampleGedcom.ReadText());
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+    }
+
+    /// <summary>Jediný vstupní bod načtení dokumentu (upload i vzorový GEDCOM sdílejí tuto cestu).</summary>
+    private void LoadGedcomText(string text)
+    {
+        AppState.Document = Parser.Parse(text);
+        _doc = AppState.Document;
+        _panel = PanelView.None;
+        EnsureRootPersonId();
+        _dirty = false;
+        StateHasChanged();
     }
 
     private async Task ExportGedcomAsync()
@@ -832,6 +894,7 @@
         var text = GedcomWriter.Write(_doc);
         var module = await GetExportModuleAsync();
         await module.InvokeVoidAsync("downloadText", text, "koreny-export.ged", "text/plain;charset=utf-8");
+        _dirty = false;
     }
 
     private async ValueTask<IJSObjectReference> GetExportModuleAsync()
