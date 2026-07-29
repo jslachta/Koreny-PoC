@@ -8,11 +8,9 @@
 
 <PageTitle>Kořeny</PageTitle>
 
-<main style="width: 100%; max-width: none; margin: 0 auto; padding: 1rem;">
-    <h1>
-      <svg viewBox="0 0 100 100" width="40" height="40"
-           style="vertical-align:middle;margin-right:8px"
-           xmlns="http://www.w3.org/2000/svg">
+<header class="k-header">
+    <svg viewBox="0 0 100 100" width="46" height="46"
+         xmlns="http://www.w3.org/2000/svg">
         <rect width="100" height="100" rx="16" fill="#2D5A3D"/>
         <rect x="46" y="38" width="8" height="28" rx="2" fill="#E8D5A3"/>
         <line x1="50" y1="42" x2="30" y2="24" stroke="#E8D5A3" stroke-width="4" stroke-linecap="round"/>
@@ -24,211 +22,312 @@
         <line x1="50" y1="66" x2="20" y2="72" stroke="#E8D5A3" stroke-width="3" stroke-linecap="round"/>
         <line x1="50" y1="66" x2="80" y2="72" stroke="#E8D5A3" stroke-width="3" stroke-linecap="round"/>
         <line x1="50" y1="66" x2="50" y2="84" stroke="#E8D5A3" stroke-width="3" stroke-linecap="round"/>
-      </svg>
-      Kořeny
-    </h1>
+    </svg>
+    <div>
+        <h1 class="k-title">Kořeny</h1>
+        <p class="k-tagline">Rodokmen z vašeho GEDCOM souboru</p>
+    </div>
+</header>
 
-    @if (!string.IsNullOrEmpty(_loadError))
-    {
-        <p role="alert">@_loadError</p>
-    }
+@if (!string.IsNullOrEmpty(_loadError))
+{
+    <p class="k-alert" role="alert">@_loadError</p>
+}
 
-    <div style="display: flex; width: 100%; gap: 1rem; align-items: stretch;">
-        <div style="flex: 3; min-width: 0; display: flex; flex-direction: column;">
-            @* Three-row toolbar: file / view / stats; hr separates rows without adding controls. *@
-            <div style="margin-bottom: 0.75rem;">
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-                    <InputFile id="gedcomInput" OnChange="OnFileSelectedAsync" style="display:none" accept=".ged" />
-                    <button type="button" onclick="document.getElementById('gedcomInput').click()">Načíst GEDCOM</button>
-                    <span aria-hidden="true">|</span>
-                    <button type="button" @onclick="LoadSampleGedcomAsync">Načíst vzorový GEDCOM</button>
-                    <span aria-hidden="true">|</span>
-                    <button type="button" @onclick="ExportGedcomAsync" disabled="@(_doc is null)">Uložit GEDCOM</button>
-                </div>
-                <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid #ccc;" />
-                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-                    <button type="button" @onclick="OpenTopolaOverlay" disabled="@(_doc is null || _doc.Individuals.Count == 0)">Zobrazit rodokmen</button>
-                    <span aria-hidden="true">|</span>
-                    <button type="button" @onclick="StartTreeDownload" disabled="@(_doc is null || _doc.Individuals.Count == 0 || _downloadingTree)">Stáhnout rodokmen</button>
-                </div>
-                <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid #ccc;" />
-                @if (_doc is not null)
-                {
-                    <span role="status">Osoby: @_doc.Individuals.Count, rodiny: @_doc.Families.Count</span>
-                }
+<div class="k-layout">
+    <div class="k-col-main">
+        <div class="k-card k-toolbar">
+            <div class="k-toolbar-group">
+                <InputFile id="gedcomInput" OnChange="OnFileSelectedAsync" style="display:none" accept=".ged" />
+                <button type="button" class="k-btn" onclick="document.getElementById('gedcomInput').click()">Načíst GEDCOM</button>
+                <button type="button" class="k-btn" @onclick="LoadSampleGedcomAsync">Vzorová rodina</button>
+                <button type="button" class="k-btn" @onclick="ExportGedcomAsync" disabled="@(_doc is null)">Uložit GEDCOM</button>
             </div>
 
-            @if (_doc is not null)
+            <div class="k-toolbar-sep" aria-hidden="true"></div>
+
+            <div class="k-toolbar-group">
+                <button type="button" class="k-btn k-btn--primary" @onclick="OpenTopolaOverlay" disabled="@(_doc is null || _doc.Individuals.Count == 0)">Zobrazit rodokmen</button>
+                <button type="button" class="k-btn k-btn--outline" @onclick="StartTreeDownload" disabled="@(_doc is null || _doc.Individuals.Count == 0 || _downloadingTree)">
+                    @(_downloadingTree ? "Připravuji…" : "Stáhnout rodokmen")
+                </button>
+            </div>
+
+            <span class="k-spacer"></span>
+
+            @if (_doc is not null && _doc.Individuals.Count > 0)
+            {
+                <span class="k-chip" role="status"><b>@_doc.Individuals.Count</b> osob · <b>@_doc.Families.Count</b> rodin</span>
+            }
+        </div>
+
+        <div class="k-card k-canvas">
+            @if (_doc is not null && _doc.Individuals.Count > 0)
             {
                 <HourglassTree Document="@_doc"
                                RootPersonId="@_rootPersonId"
                                OnPersonSelected="OnTreePersonSelected"
                                OnPersonDoubleClicked="OnTreePersonDoubleClicked" />
             }
+            else
+            {
+                <div class="k-empty">
+                    <svg viewBox="0 0 100 100" width="46" height="46" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="100" height="100" rx="16" fill="#2D5A3D" />
+                        <rect x="46" y="38" width="8" height="28" rx="2" fill="#E8D5A3" />
+                        <line x1="50" y1="42" x2="30" y2="24" stroke="#E8D5A3" stroke-width="4" stroke-linecap="round" />
+                        <line x1="50" y1="42" x2="70" y2="24" stroke="#E8D5A3" stroke-width="4" stroke-linecap="round" />
+                        <line x1="50" y1="66" x2="30" y2="82" stroke="#E8D5A3" stroke-width="4" stroke-linecap="round" />
+                        <line x1="50" y1="66" x2="70" y2="82" stroke="#E8D5A3" stroke-width="4" stroke-linecap="round" />
+                        <line x1="50" y1="66" x2="50" y2="84" stroke="#E8D5A3" stroke-width="3" stroke-linecap="round" />
+                    </svg>
+                    <h2 class="k-empty-title">Tady bude váš rodokmen</h2>
+                    <p class="k-empty-text">Načtěte GEDCOM export z MyHeritage nebo Ancestry — nebo si to nejdřív vyzkoušejte na vzorové rodině.</p>
+                    <div class="k-empty-actions">
+                        <button type="button" class="k-btn k-btn--primary" @onclick="LoadSampleGedcomAsync">Zkusit vzorovou rodinu</button>
+                        <button type="button" class="k-btn k-btn--outline" onclick="document.getElementById('gedcomInput').click()">Načíst GEDCOM</button>
+                    </div>
+                </div>
+            }
         </div>
+    </div>
 
-        <aside style="flex: 2; min-width: 0; border-left: 1px solid #ccc; padding-left: 1rem; display: flex; flex-direction: column; min-height: 0; max-height: calc(100vh - 7rem);">
-            <div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+    <aside class="k-col-side">
+        <div class="k-card k-panel">
                 @switch (_panel)
                 {
                     case PanelView.None:
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; flex-shrink: 0;">
-                            <button type="button" @onclick="StartNewPerson" disabled="@(_doc is null)">Nová osoba</button>
-                            <span aria-hidden="true">|</span>
-                            <button type="button" @onclick="StartNewFamily" disabled="@(_doc is null)">Nová rodina</button>
+                        <div class="k-panel-head">
+                            <h2 class="k-panel-title">Osoby</h2>
+                            <div class="k-toolbar-group">
+                                <button type="button" class="k-btn k-btn--sm" @onclick="StartNewPerson" disabled="@(_doc is null)">+ Osoba</button>
+                                <button type="button" class="k-btn k-btn--sm" @onclick="StartNewFamily" disabled="@(_doc is null)">+ Rodina</button>
+                            </div>
                         </div>
-                        <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid #ccc;" />
-                        @if (_doc is not null)
+
+                        @if (_doc is not null && _doc.Families.Count > 0)
                         {
-                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; flex-shrink: 0;">
-                                <label for="fam-pick" style="margin: 0;">Upravit rodinu:</label>
-                                <select id="fam-pick" @bind="_pickFamilyId" disabled="@(_doc.Families.Count == 0)">
+                            <div class="k-panel-head" style="gap: 0.5rem;">
+                                <label class="k-label" for="fam-pick" style="flex: 0 0 auto;">Upravit rodinu</label>
+                                <select id="fam-pick" class="k-select" style="flex: 1;" @bind="_pickFamilyId">
                                     @for (var fi = 0; fi < _doc.Families.Count; fi++)
                                     {
                                         var f = _doc.Families[fi];
                                         <option value="@f.Id">@FamilyLabel(f, fi + 1)</option>
                                     }
                                 </select>
-                                <button type="button" @onclick="OpenPickedFamilyForEdit" disabled="@(_doc.Families.Count == 0 || string.IsNullOrEmpty(_pickFamilyId))">Otevřít</button>
+                                <button type="button" class="k-btn k-btn--sm" @onclick="OpenPickedFamilyForEdit" disabled="@(string.IsNullOrEmpty(_pickFamilyId))">Otevřít</button>
                             </div>
-                            <hr style="margin: 0.5rem 0; border: 0; border-top: 1px solid #ccc;" />
                         }
-                        <p style="margin-top: 0; flex-shrink: 0;" role="status">@SelectedPersonStatus()</p>
-                        <div style="flex: 1; min-height: 0; overflow: auto;">
-                            @if (_doc is not null)
-                            {
-                                @foreach (var p in GetIndividualsSorted())
-                                {
-                                    var rowId = p.Id;
-                                    var selected = rowId == _rootPersonId;
-                                    <div style="display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.35rem; padding: 0.15rem 0.35rem; border-radius: 4px; background: @(selected ? "#cfe3ff" : "transparent");">
-                                        <button type="button"
-                                                @onclick="@(() => SelectPerson(rowId))"
-                                                aria-pressed="@(selected ? "true" : "false")"
-                                                style="flex: 1; text-align: left; cursor: pointer; background: transparent; border: none; font: inherit; padding: 0.1rem 0; @(selected ? "font-weight: 600;" : "")">
-                                            @p.FullName — @FormatLifespanYears(p)
-                                        </button>
-                                        @if (selected)
-                                        {
-                                            <button type="button" @onclick="@(() => OpenPersonForEdit(rowId))" title="Upravit vybranou osobu">Upravit</button>
-                                        }
-                                    </div>
-                                }
-                            }
-                        </div>
-                        break;
-                    case PanelView.Person:
-                        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                            <h2 style="margin-top: 0;">@(_personIsNew ? "Nová osoba" : "Upravit osobu")</h2>
-                            <div style="flex: 1; overflow: auto; min-height: 0;">
-                                <div style="display: grid; gap: 0.5rem;">
-                                    <label>Jméno <input @bind="_personForm.Given" /></label>
-                                    <label>Příjmení <input @bind="_personForm.Surname" /></label>
-                                    <label>
-                                        Pohlaví
-                                        <select @bind="_personForm.SexCode">
-                                            <option value="0">Neznámé</option>
-                                            <option value="1">Muž</option>
-                                            <option value="2">Žena</option>
-                                        </select>
-                                    </label>
-                                    <label>Datum narození <input @bind="_personForm.BirthDate" placeholder="např. 3 MAR 1901" /></label>
-                                    <label>Místo narození <input @bind="_personForm.BirthPlace" /></label>
-                                    <label>Datum úmrtí <input @bind="_personForm.DeathDate" placeholder="např. 1 MAR 1980" /></label>
-                                    <label>Místo úmrtí <input @bind="_personForm.DeathPlace" /></label>
-                                    <label>Poznámka <input @bind="_personForm.NoteFirst" /></label>
+                        else if (_doc is not null && _doc.Individuals.Count > 0)
+                        {
+                            <div style="padding: 0.75rem 1.1rem 0;">
+                                <div class="k-hint">
+                                    <span class="k-hint-icon" aria-hidden="true">👪</span>
+                                    <span>Zatím žádná rodina. Rodina spojuje dvě osoby — přidejte je a pak zvolte <strong>+ Rodina</strong>.</span>
                                 </div>
                             </div>
-                            <div style="margin-top: 0.75rem; flex-shrink: 0;">
-                                <button type="button" @onclick="SavePerson">Uložit</button>
-                                @if (!_personIsNew)
-                                {
-                                    <button type="button" @onclick="DeletePerson">Smazat</button>
-                                }
-                                <button type="button" @onclick="CancelPanel">Zrušit</button>
-                            </div>
-                        </div>
-                        break;
-                    case PanelView.Family:
-                        <div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
-                            <h2 style="margin-top: 0;">@(_familyIsNew ? "Nová rodina" : "Upravit rodinu")</h2>
+                        }
+
+                        <p class="k-status" role="status">@((MarkupString)SelectedPersonStatusHtml())</p>
+
+                        <div class="k-panel-body k-panel-body--flush">
                             @if (_doc is null || _doc.Individuals.Count == 0)
                             {
-                                <p>Nejdříve přidejte alespoň jednu osobu.</p>
-                                <div style="margin-top: 0.75rem; flex-shrink: 0;">
-                                    <button type="button" @onclick="CancelPanel">Zpět</button>
+                                <div class="k-empty">
+                                    <div class="k-empty-icon" aria-hidden="true">🌱</div>
+                                    <h3 class="k-empty-title">Zatím tu nikdo není</h3>
+                                    <p class="k-empty-text">Přidejte první osobu tlačítkem <strong>+ Osoba</strong>, nebo vlevo načtěte vzorovou rodinu.</p>
                                 </div>
                             }
                             else
                             {
-                                <div style="flex: 1; overflow: auto; min-height: 0;">
-                                    <div style="display: grid; gap: 0.5rem;">
-                                        <label>
-                                            Manžel
-                                            <select @bind="_familyForm.HusbandId">
-                                                <option value="">(žádný)</option>
-                                                @foreach (var p in _doc.Individuals)
-                                                {
-                                                    <option value="@p.Id">@p.FullName (@p.Id)</option>
-                                                }
-                                            </select>
-                                        </label>
-                                        <label>
-                                            Manželka
-                                            <select @bind="_familyForm.WifeId">
-                                                <option value="">(žádná)</option>
-                                                @foreach (var p in _doc.Individuals)
-                                                {
-                                                    <option value="@p.Id">@p.FullName (@p.Id)</option>
-                                                }
-                                            </select>
-                                        </label>
-                                        <fieldset>
-                                            <legend>Děti</legend>
-                                            @foreach (var c in _doc.Individuals)
-                                            {
-                                                var cid = c.Id;
-                                                <label style="display: block;">
-                                                    <input type="checkbox" checked="@IsFamilyChildChecked(cid)" @onchange="@(e => OnFamilyChildToggle(cid, e))" />
-                                                    @c.FullName (@cid)
-                                                </label>
-                                            }
-                                        </fieldset>
-                                        <label>Datum sňatku <input @bind="_familyForm.MarriageDate" placeholder="např. 15 JUN 1925" /></label>
-                                        <label>Místo sňatku <input @bind="_familyForm.MarriagePlace" /></label>
-                                    </div>
-                                </div>
-                                <div style="margin-top: 0.75rem; flex-shrink: 0;">
-                                    <button type="button" @onclick="SaveFamily">Uložit</button>
-                                    @if (!_familyIsNew)
+                                <div class="k-list">
+                                    @foreach (var p in GetIndividualsSorted())
                                     {
-                                        <button type="button" @onclick="DeleteFamily">Smazat</button>
+                                        var rowId = p.Id;
+                                        var selected = rowId == _rootPersonId;
+                                        <div class="k-row @(selected ? "is-selected" : "")">
+                                            <button type="button"
+                                                    class="k-row-main"
+                                                    @onclick="@(() => SelectPerson(rowId))"
+                                                    aria-pressed="@(selected ? "true" : "false")">
+                                                <span class="k-row-name">@p.FullName</span>
+                                                <span class="k-row-years">@FormatLifespanYears(p)</span>
+                                            </button>
+                                            @if (selected)
+                                            {
+                                                <button type="button" class="k-btn k-btn--sm k-btn--outline" @onclick="@(() => OpenPersonForEdit(rowId))" title="Upravit vybranou osobu">Upravit</button>
+                                            }
+                                        </div>
                                     }
-                                    <button type="button" @onclick="CancelPanel">Zrušit</button>
                                 </div>
                             }
                         </div>
                         break;
+                    case PanelView.Person:
+                        <div class="k-panel-head">
+                            <h2 class="k-panel-title">@(_personIsNew ? "Nová osoba" : "Upravit osobu")</h2>
+                        </div>
+                        <div class="k-panel-body">
+                            <div class="k-form">
+                                <div class="k-field">
+                                    <label class="k-label" for="p-given">Jméno</label>
+                                    <input id="p-given" class="k-input" @bind="_personForm.Given" />
+                                </div>
+                                <div class="k-field">
+                                    <label class="k-label" for="p-surname">Příjmení</label>
+                                    <input id="p-surname" class="k-input" @bind="_personForm.Surname" />
+                                </div>
+                                <div class="k-field">
+                                    <label class="k-label" for="p-sex">Pohlaví</label>
+                                    <select id="p-sex" class="k-select" @bind="_personForm.SexCode">
+                                        <option value="0">Neznámé</option>
+                                        <option value="1">Muž</option>
+                                        <option value="2">Žena</option>
+                                    </select>
+                                </div>
+                                <div class="k-field">
+                                    <label class="k-label" for="p-bdate">Datum narození</label>
+                                    <input id="p-bdate" class="k-input" @bind="_personForm.BirthDate" placeholder="např. 3 MAR 1901" />
+                                </div>
+                                <div class="k-field">
+                                    <label class="k-label" for="p-bplace">Místo narození</label>
+                                    <input id="p-bplace" class="k-input" @bind="_personForm.BirthPlace" />
+                                </div>
+                                <div class="k-field">
+                                    <label class="k-label" for="p-ddate">Datum úmrtí</label>
+                                    <input id="p-ddate" class="k-input" @bind="_personForm.DeathDate" placeholder="např. 1 MAR 1980" />
+                                </div>
+                                <div class="k-field">
+                                    <label class="k-label" for="p-dplace">Místo úmrtí</label>
+                                    <input id="p-dplace" class="k-input" @bind="_personForm.DeathPlace" />
+                                </div>
+                                <div class="k-field">
+                                    <label class="k-label" for="p-note">Poznámka</label>
+                                    <input id="p-note" class="k-input" @bind="_personForm.NoteFirst" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="k-panel-foot">
+                            <button type="button" class="k-btn k-btn--primary" @onclick="SavePerson">Uložit</button>
+                            <button type="button" class="k-btn k-btn--ghost" @onclick="CancelPanel">Zrušit</button>
+                            <span class="k-spacer"></span>
+                            @if (!_personIsNew)
+                            {
+                                <button type="button" class="k-btn k-btn--danger" @onclick="DeletePerson">Smazat</button>
+                            }
+                        </div>
+                        break;
+                    case PanelView.Family:
+                        <div class="k-panel-head">
+                            <h2 class="k-panel-title">@(_familyIsNew ? "Nová rodina" : "Upravit rodinu")</h2>
+                        </div>
+                        @if (_doc is null || _doc.Individuals.Count == 0)
+                        {
+                            <div class="k-panel-body">
+                                <div class="k-empty">
+                                    <div class="k-empty-icon" aria-hidden="true">👤</div>
+                                    <h3 class="k-empty-title">Nejdřív potřebujeme aspoň jednu osobu</h3>
+                                    <p class="k-empty-text">Rodina spojuje dvě osoby, které zatím nemáte. Přidejte první osobu — a vrátíme vás rovnou sem.</p>
+                                    <div class="k-empty-actions">
+                                        <button type="button" class="k-btn k-btn--primary" @onclick="StartNewPersonThenReturnToFamily">Přidat osobu</button>
+                                        <button type="button" class="k-btn k-btn--outline" @onclick="CancelPanel">Zpět</button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="k-panel-body">
+                                <div class="k-form">
+                                    <div class="k-field">
+                                        <label class="k-label" for="f-husb">Manžel</label>
+                                        <select id="f-husb" class="k-select" @bind="_familyForm.HusbandId">
+                                            <option value="">(žádný)</option>
+                                            @foreach (var p in _doc.Individuals)
+                                            {
+                                                <option value="@p.Id">@p.FullName (@p.Id)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="k-field">
+                                        <label class="k-label" for="f-wife">Manželka</label>
+                                        <select id="f-wife" class="k-select" @bind="_familyForm.WifeId">
+                                            <option value="">(žádná)</option>
+                                            @foreach (var p in _doc.Individuals)
+                                            {
+                                                <option value="@p.Id">@p.FullName (@p.Id)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <fieldset class="k-fieldset">
+                                        <legend class="k-legend">Děti</legend>
+                                        <div class="k-check-list">
+                                            @foreach (var c in _doc.Individuals)
+                                            {
+                                                var cid = c.Id;
+                                                <label class="k-check">
+                                                    <input type="checkbox" checked="@IsFamilyChildChecked(cid)" @onchange="@(e => OnFamilyChildToggle(cid, e))" />
+                                                    <span>@c.FullName</span>
+                                                    <span class="k-check-id">@cid</span>
+                                                </label>
+                                            }
+                                        </div>
+                                    </fieldset>
+                                    <div class="k-field">
+                                        <label class="k-label" for="f-mdate">Datum sňatku</label>
+                                        <input id="f-mdate" class="k-input" @bind="_familyForm.MarriageDate" placeholder="např. 15 JUN 1925" />
+                                    </div>
+                                    <div class="k-field">
+                                        <label class="k-label" for="f-mplace">Místo sňatku</label>
+                                        <input id="f-mplace" class="k-input" @bind="_familyForm.MarriagePlace" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="k-panel-foot">
+                                <button type="button" class="k-btn k-btn--primary" @onclick="SaveFamily">Uložit</button>
+                                <button type="button" class="k-btn k-btn--ghost" @onclick="CancelPanel">Zrušit</button>
+                                <span class="k-spacer"></span>
+                                @if (!_familyIsNew)
+                                {
+                                    <button type="button" class="k-btn k-btn--danger" @onclick="DeleteFamily">Smazat</button>
+                                }
+                            </div>
+                        }
+                        break;
                 }
-            </div>
-        </aside>
-    </div>
-</main>
+        </div>
+    </aside>
+</div>
 
 @if (_showTopolaOverlay && _doc is not null)
 {
-    <div style="position: fixed; inset: 0; z-index: 1000; background: #fff; outline: none;"
+    <div class="k-overlay"
          tabindex="-1"
          @ref="_topolaOverlayRef"
          @onkeydown="OnTopolaKeyDown">
-        <div style="position: absolute; top: 0.5rem; right: 0.5rem; z-index: 1001; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: flex-end;">
-            <button type="button" @onclick="PrintTreeFromOverlayAsync">Tisk</button>
-            <button type="button" @onclick="DownloadTreeFromOverlayAsync">Stáhnout rodokmen</button>
+        <div class="k-overlay-bar">
+            <span class="k-overlay-title">
+                <svg viewBox="0 0 100 100" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <rect width="100" height="100" rx="16" fill="#2D5A3D" />
+                    <rect x="46" y="38" width="8" height="28" rx="2" fill="#E8D5A3" />
+                    <line x1="50" y1="42" x2="30" y2="24" stroke="#E8D5A3" stroke-width="6" stroke-linecap="round" />
+                    <line x1="50" y1="42" x2="70" y2="24" stroke="#E8D5A3" stroke-width="6" stroke-linecap="round" />
+                    <line x1="50" y1="66" x2="30" y2="82" stroke="#E8D5A3" stroke-width="6" stroke-linecap="round" />
+                    <line x1="50" y1="66" x2="70" y2="82" stroke="#E8D5A3" stroke-width="6" stroke-linecap="round" />
+                </svg>
+                Rodokmen
+            </span>
+            <button type="button" class="k-btn k-btn--sm" @onclick="PrintTreeFromOverlayAsync">Tisk</button>
+            <button type="button" class="k-btn k-btn--sm k-btn--outline" @onclick="DownloadTreeFromOverlayAsync">Stáhnout rodokmen</button>
             <button type="button"
+                    class="k-btn k-btn--icon k-btn--ghost"
                     @onclick="CloseTopolaOverlay"
+                    title="Zavřít (Esc)"
                     aria-label="Zavřít">×</button>
         </div>
-        <div style="position: absolute; inset: 0; padding: 0;">
+        <div class="k-overlay-body">
             <TopolaTree @ref="_topolaTree"
                         Document="@_doc"
                         RootPersonId="@_rootPersonId"
@@ -402,6 +501,24 @@
         }
     }
 
+    /// <summary>
+    /// Select rodin ukazuje první položku, ale @bind drží prázdno, dokud uživatel ručně nepřepne —
+    /// tlačítko „Otevřít" by tak bylo mrtvé. Držíme proto výběr synchronizovaný s tím, co je vidět.
+    /// </summary>
+    private void EnsurePickedFamilyId()
+    {
+        if (_doc is null || _doc.Families.Count == 0)
+        {
+            _pickFamilyId = string.Empty;
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_pickFamilyId) || _doc.Families.All(f => f.Id != _pickFamilyId))
+        {
+            _pickFamilyId = _doc.Families[0].Id;
+        }
+    }
+
     private void EnsureRootPersonId()
     {
         _doc = AppState.Document;
@@ -515,19 +632,24 @@
         StateHasChanged();
     }
 
-    private string SelectedPersonStatus()
+    /// <summary>Stavový řádek nad seznamem; jméno vybrané osoby je zvýrazněné (HTML se skládá jen z našich textů + escapovaného jména).</summary>
+    private string SelectedPersonStatusHtml()
     {
         if (_doc is null || _doc.Individuals.Count == 0)
         {
-            return "Vyberte osobu nebo přidejte novou.";
+            return "Zatím žádné osoby.";
         }
 
         var sel = string.IsNullOrEmpty(_rootPersonId)
             ? null
             : _doc.Individuals.FirstOrDefault(x => x.Id == _rootPersonId);
-        return sel is null
-            ? "Vyberte osobu v seznamu."
-            : $"Vybraná osoba: {sel.FullName}";
+        if (sel is null)
+        {
+            return "Vyberte osobu v seznamu.";
+        }
+
+        var name = System.Net.WebUtility.HtmlEncode(sel.FullName);
+        return $"Vybraná osoba: <strong>{name}</strong>";
     }
 
     private IEnumerable<GedcomIndividual> GetIndividualsSorted()
@@ -564,6 +686,9 @@
         return "?";
     }
 
+    /// <summary>Nastaveno, když osoba vzniká z prázdného stavu „nová rodina" — po uložení se vrátíme k rodině.</summary>
+    private bool _returnToNewFamilyAfterPerson;
+
     private void StartNewPerson()
     {
         if (_doc is null)
@@ -575,6 +700,12 @@
         _personIsNew = true;
         _editPersonId = null;
         _personForm = new PersonFormState();
+    }
+
+    private void StartNewPersonThenReturnToFamily()
+    {
+        _returnToNewFamilyAfterPerson = true;
+        StartNewPerson();
     }
 
     private void OpenPersonForEdit(string id)
@@ -620,6 +751,12 @@
         _doc.InvalidateLookups();
         _dirty = true;
         _panel = PanelView.None;
+        if (_returnToNewFamilyAfterPerson)
+        {
+            _returnToNewFamilyAfterPerson = false;
+            StartNewFamily();
+        }
+
         EnsureRootPersonId();
         StateHasChanged();
     }
@@ -770,6 +907,7 @@
         _doc.InvalidateLookups();
         _dirty = true;
         _panel = PanelView.None;
+        EnsurePickedFamilyId();
         StateHasChanged();
     }
 
@@ -790,11 +928,15 @@
         _doc.InvalidateLookups();
         _dirty = true;
         _panel = PanelView.None;
+        EnsurePickedFamilyId();
         StateHasChanged();
     }
 
     private void CancelPanel()
     {
+        // Zrušením formuláře zaniká i záměr „přidat osobu a vrátit se k nové rodině",
+        // jinak by na něj narazilo až příští uložení jiné osoby.
+        _returnToNewFamilyAfterPerson = false;
         _panel = PanelView.None;
     }
 
@@ -879,7 +1021,9 @@
         AppState.Document = Parser.Parse(text);
         _doc = AppState.Document;
         _panel = PanelView.None;
+        _returnToNewFamilyAfterPerson = false; // nový dokument ruší rozdělanou cestu „nová rodina"
         EnsureRootPersonId();
+        EnsurePickedFamilyId();
         _dirty = false;
         StateHasChanged();
     }

@@ -10,7 +10,7 @@ else
 {
     
     <svg width="@_svgWidth" height="@_svgHeight" xmlns="http://www.w3.org/2000/svg" style="display: block; max-width: 100%; height: auto;">
-        <g stroke="#666" stroke-width="1" fill="none">
+        <g stroke="@LinkColor" stroke-width="1.25" fill="none">
             @foreach (var seg in _segments)
             {
                 <line x1="@F(seg.X1)" y1="@F(seg.Y1)" x2="@F(seg.X2)" y2="@F(seg.Y2)" />
@@ -20,12 +20,13 @@ else
         {
             var left = n.CenterX - NodeWidth * 0.5;
             var top = n.CenterY - NodeHeight * 0.5;
+            var isRoot = n.Id == RootPersonId;
             <g style="cursor: pointer;" @onclick="@(() => OnNodeClickAsync(n.Id))" @ondblclick="@(() => OnNodeDoubleClickAsync(n.Id))" @onclick:stopPropagation="true">
                 <title>@n.FullName — @n.Lifespan</title>
-                <rect x="@F(left)" y="@F(top)" width="@F(NodeWidth)" height="@F(NodeHeight)"
-                      fill="#f9f9f9" stroke="#333" />
-                <text x="@F(n.CenterX)" y="@F(n.CenterY - TextLineOffsetY)" text-anchor="middle" font-size="@F(NameFontSize)" fill="#111">@Truncate(n.FullName)</text>
-                <text x="@F(n.CenterX)" y="@F(n.CenterY + LifespanLineOffsetY)" text-anchor="middle" font-size="@F(LifespanFontSize)" fill="#444">@n.Lifespan</text>
+                <rect x="@F(left)" y="@F(top)" width="@F(NodeWidth)" height="@F(NodeHeight)" rx="8" ry="8"
+                      fill="@(isRoot ? RootFill : NodeFill)" stroke="@(isRoot ? RootStroke : NodeStroke)" stroke-width="@(isRoot ? "2" : "1")" />
+                <text x="@F(n.CenterX)" y="@F(n.CenterY - TextLineOffsetY)" text-anchor="middle" font-size="@F(NameFontSize)" font-weight="@(isRoot ? "650" : "500")" fill="@InkColor">@Truncate(n.FullName)</text>
+                <text x="@F(n.CenterX)" y="@F(n.CenterY + LifespanLineOffsetY)" text-anchor="middle" font-size="@F(LifespanFontSize)" fill="@MutedColor">@n.Lifespan</text>
             </g>
         }
     </svg>
@@ -46,6 +47,15 @@ else
     private const double TextLineOffsetY = 6;
     private const double LifespanLineOffsetY = 14;
     private const int MaxNameChars = 22;
+
+    /// <summary>Barvy odpovídají design systému v css/app.css (SVG neumí CSS proměnné z hostitele při exportu).</summary>
+    private const string NodeFill = "#FFFFFF";
+    private const string NodeStroke = "#D3CCBD";
+    private const string RootFill = "#EDF3EE";
+    private const string RootStroke = "#2D5A3D";
+    private const string LinkColor = "#C3BCAB";
+    private const string InkColor = "#1C2320";
+    private const string MutedColor = "#78827B";
 
     private GedcomIndividual? _root;
     private readonly List<LayoutNode> _nodes = new();
@@ -266,7 +276,8 @@ else
     {
         var sb = new System.Text.StringBuilder();
         sb.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"").Append(F(_svgWidth)).Append("\" height=\"").Append(F(_svgHeight)).Append("\" style=\"display:block;max-width:100%;height:auto\">");
-        sb.Append("<g stroke=\"#666\" stroke-width=\"1\" fill=\"none\">");
+        sb.Append("<rect x=\"0\" y=\"0\" width=\"").Append(F(_svgWidth)).Append("\" height=\"").Append(F(_svgHeight)).Append("\" fill=\"#FFFFFF\"/>");
+        sb.Append("<g stroke=\"").Append(LinkColor).Append("\" stroke-width=\"1.25\" fill=\"none\">");
         foreach (var seg in _segments)
         {
             sb.Append("<line x1=\"").Append(F(seg.X1)).Append("\" y1=\"").Append(F(seg.Y1)).Append("\" x2=\"").Append(F(seg.X2)).Append("\" y2=\"").Append(F(seg.Y2)).Append("\"/>");
@@ -277,11 +288,15 @@ else
         {
             var left = n.CenterX - NodeWidth * 0.5;
             var top = n.CenterY - NodeHeight * 0.5;
+            var isRoot = n.Id == RootPersonId;
             sb.Append("<g>");
             sb.Append("<title>").Append(XmlEscape($"{n.FullName} — {n.Lifespan}")).Append("</title>");
-            sb.Append("<rect x=\"").Append(F(left)).Append("\" y=\"").Append(F(top)).Append("\" width=\"").Append(F(NodeWidth)).Append("\" height=\"").Append(F(NodeHeight)).Append("\" fill=\"#f9f9f9\" stroke=\"#333\"/>");
-            sb.Append("<text x=\"").Append(F(n.CenterX)).Append("\" y=\"").Append(F(n.CenterY - TextLineOffsetY)).Append("\" text-anchor=\"middle\" font-size=\"").Append(F(NameFontSize)).Append("\" fill=\"#111\">").Append(XmlEscape(Truncate(n.FullName))).Append("</text>");
-            sb.Append("<text x=\"").Append(F(n.CenterX)).Append("\" y=\"").Append(F(n.CenterY + LifespanLineOffsetY)).Append("\" text-anchor=\"middle\" font-size=\"").Append(F(LifespanFontSize)).Append("\" fill=\"#444\">").Append(XmlEscape(n.Lifespan)).Append("</text>");
+            sb.Append("<rect x=\"").Append(F(left)).Append("\" y=\"").Append(F(top)).Append("\" width=\"").Append(F(NodeWidth)).Append("\" height=\"").Append(F(NodeHeight))
+              .Append("\" rx=\"8\" ry=\"8\" fill=\"").Append(isRoot ? RootFill : NodeFill)
+              .Append("\" stroke=\"").Append(isRoot ? RootStroke : NodeStroke)
+              .Append("\" stroke-width=\"").Append(isRoot ? "2" : "1").Append("\"/>");
+            sb.Append("<text x=\"").Append(F(n.CenterX)).Append("\" y=\"").Append(F(n.CenterY - TextLineOffsetY)).Append("\" text-anchor=\"middle\" font-size=\"").Append(F(NameFontSize)).Append("\" font-weight=\"").Append(isRoot ? "650" : "500").Append("\" fill=\"").Append(InkColor).Append("\">").Append(XmlEscape(Truncate(n.FullName))).Append("</text>");
+            sb.Append("<text x=\"").Append(F(n.CenterX)).Append("\" y=\"").Append(F(n.CenterY + LifespanLineOffsetY)).Append("\" text-anchor=\"middle\" font-size=\"").Append(F(LifespanFontSize)).Append("\" fill=\"").Append(MutedColor).Append("\">").Append(XmlEscape(n.Lifespan)).Append("</text>");
             sb.Append("</g>");
         }
 
