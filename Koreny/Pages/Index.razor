@@ -881,14 +881,11 @@
         }
 
         var ind = _doc.Individuals.FirstOrDefault(x => x.Id == _editPersonId);
-        StripIndividualFromFamilies(_editPersonId);
-        _doc.Individuals.RemoveAll(x => x.Id == _editPersonId);
         if (ind is not null)
         {
-            GedcomSync.RemoveIndividualNode(_doc, ind);
+            GedcomSync.RemoveIndividual(_doc, ind); // včetně HUSB/WIFE/CHIL odkazů na ni
         }
 
-        _doc.InvalidateLookups();
         _dirty = true;
         if (_rootPersonId == _editPersonId)
         {
@@ -897,29 +894,9 @@
 
         _panel = PanelView.None;
         EnsureRootPersonId();
+        EnsurePickedFamilyId();
         StateHasChanged();
     }
-
-    private static void StripIndividualFromFamilies(string personId, GedcomDocument doc)
-    {
-        foreach (var f in doc.Families)
-        {
-            if (f.HusbandId == personId)
-            {
-                f.HusbandId = null;
-            }
-
-            if (f.WifeId == personId)
-            {
-                f.WifeId = null;
-            }
-
-            f.ChildrenIds.RemoveAll(c => c == personId);
-        }
-    }
-
-    private void StripIndividualFromFamilies(string personId) =>
-        StripIndividualFromFamilies(personId, _doc!);
 
     private void StartNewFamily()
     {
@@ -1071,13 +1048,11 @@
         }
 
         var fam = _doc.Families.FirstOrDefault(x => x.Id == _editFamilyId);
-        _doc.Families.RemoveAll(x => x.Id == _editFamilyId);
         if (fam is not null)
         {
-            GedcomSync.RemoveFamilyNode(_doc, fam);
+            GedcomSync.RemoveFamily(_doc, fam); // včetně FAMS/FAMC odkazů na ni
         }
 
-        _doc.InvalidateLookups();
         _dirty = true;
         _panel = PanelView.None;
         EnsurePickedFamilyId();

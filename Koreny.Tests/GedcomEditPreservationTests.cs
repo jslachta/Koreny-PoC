@@ -92,18 +92,19 @@ public class GedcomEditPreservationTests
     }
 
     /// <summary>
-    /// (d) Smazání osoby @I4@ v corpus-05: zmizí jen její INDI záznam. Ostatní záznamy
-    /// zůstávají beze změny — včetně reference WIFE @I4@ v @F2@, kterou sync záměrně
-    /// neuklízí (viz zadání Session 2).
+    /// (d) Smazání osoby @I4@ v corpus-05: zmizí její INDI záznam A odkazy na ni —
+    /// z @F2@ tedy odejde i „WIFE @I4@“. Zbytek dokumentu zůstává nedotčený.
+    ///
+    /// Pozn.: dřív se odkazy záměrně nechávaly viset (Session 2). Uklízet je je teď
+    /// specifikace: commit nesmí obsahovat ukazatel na neexistující záznam.
     /// </summary>
     [Fact]
-    public void Edit_DeleteIndividual_RemovesOnlyItsRecord()
+    public void Edit_DeleteIndividual_RemovesRecordAndReferencesToIt()
     {
         var doc = _parser.Parse(Read(Path.Combine("Corpus", "corpus-05-relations.ged")));
         var ind = doc.Individuals.First(i => i.Id == "I4");
 
-        doc.Individuals.Remove(ind);
-        GedcomSync.RemoveIndividualNode(doc, ind);
+        GedcomSync.RemoveIndividual(doc, ind);
 
         AssertMatches(GedcomWriter.Write(doc), "edit-d-delete.ged");
     }

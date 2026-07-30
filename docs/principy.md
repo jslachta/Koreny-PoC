@@ -69,7 +69,12 @@ Tiché ořezání, rozbitý odkaz nebo neplatný atribut jsou bezpečnostní sel
 i když nikdo nic „nehackl".
 
 *V kódu:* rozměry SVG se formátují invariantní kulturou (desetinná čárka by rozbila atribut);
-writer láme dlouhé hodnoty dle 5.5.1; parser je tolerantní a nepadá.
+writer láme dlouhé hodnoty dle 5.5.1; parser je tolerantní a nepadá. Smazání osoby či rodiny
+odstraní i **všechny ukazatele na ně** (`HUSB`/`WIFE`/`CHIL`, `FAMS`/`FAMC` i další), takže
+commit nikdy neobsahuje odkaz na neexistující záznam.
+
+*Hranice:* uklízí se výhradně po vlastním mazání. Odkaz rozbitý už v importu se zachová —
+uložení beze změny nesmí měnit cizí soubor (princip 3 a idempotence commitu).
 
 ## 6. Invarianty žijí v doméně, ne v UI
 
@@ -102,15 +107,11 @@ nezacyklí. Text z dokumentu se do HTML vkládá escapovaný.
 
 Poctivý seznam míst, kde aplikace vlastní principy zatím neplní:
 
-1. **Smazání osoby nechává visící odkazy** (princip 5). Doménové rodiny se očistí, ale surové
-   uzly `FAM` si drží `HUSB`/`WIFE`/`CHIL` na smazaný záznam. Zachováno záměrně, aby mazání
-   neořezávalo importovaná data — ale export tím může jinému softwaru podstrčit odkaz
-   na neexistující osobu. Řešit úklidem odkazů při mazání.
-2. **Parser nebyl systematicky trápen zlomyslným vstupem** (princip 8). Chybí testy pro
+1. **Parser nebyl systematicky trápen zlomyslným vstupem** (princip 8). Chybí testy pro
    extrémní hloubku vnoření, obří počet záznamů a patologické `CONC`/`CONT` řetězení.
-3. **`MarkupString` ve stavovém řádku** (princip 8). Dnes se jméno escapuje ručně a je to
+2. **`MarkupString` ve stavovém řádku** (princip 8). Dnes se jméno escapuje ručně a je to
    pokryté, ale je to typ místa, kde díra vznikne příští nevinnou editací. Kandidát na
    nahrazení běžným řetězcem s `<strong>` mimo interpolaci.
-4. **Editor umí zlomek toho, co parser uchová** (princip 3 v duchu, ne liteře). Data se
+3. **Editor umí zlomek toho, co parser uchová** (princip 3 v duchu, ne liteře). Data se
    neztrácejí, ale spoustu z nich nelze v aplikaci upravit — uživatel to nevnímá jako
    záměr, ale jako „nejde to".

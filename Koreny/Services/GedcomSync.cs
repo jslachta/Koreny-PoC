@@ -52,22 +52,81 @@ public static class GedcomSync
         SyncNotes(node, fam.Notes);
     }
 
-    /// <summary>Odstraní uzel osoby ze stromu. Reference v rodinách (HUSB/WIFE/CHIL) se ZÁMĚRNĚ neuklízejí (viz zadání Session 2).</summary>
-    public static void RemoveIndividualNode(GedcomDocument doc, GedcomIndividual ind)
+    /// <summary>
+    /// Smaže osobu — z doménové projekce, ze stromu i ze všech odkazů na ni
+    /// (HUSB/WIFE/CHIL v rodinách, ale i případné ASSO a podobné ukazatele).
+    ///
+    /// Odkaz na neexistující záznam by jinak zůstal v exportu a jiný software by na něm mohl
+    /// selhat. Uklízí se výhradně po VLASTNÍM smazání; odkazy, které už byly rozbité v importu,
+    /// se neopravují — jinak by uložení beze změny měnilo cizí soubor (viz docs/principy.md).
+    /// </summary>
+    public static void RemoveIndividual(GedcomDocument doc, GedcomIndividual ind)
     {
-        if (ind.SourceNode is not null)
+        var id = ind.Id;
+
+        foreach (var fam in doc.Families)
         {
-            doc.Nodes.Remove(ind.SourceNode);
+            if (fam.HusbandId == id)
+            {
+                fam.HusbandId = null;
+            }
+
+            if (fam.WifeId == id)
+            {
+                fam.WifeId = null;
+            }
+
+            fam.ChildrenIds.RemoveAll(c => string.Equals(c, id, StringComparison.Ordinal));
+        }
+
+        doc.Individuals.Remove(ind);
+        RemoveRecordAndReferences(doc, ind.SourceNode, id);
+    }
+
+    /// <summary>
+    /// Smaže rodinu — ze seznamu, ze stromu i z odkazů na ni (FAMS/FAMC v záznamech osob).
+    /// Doménový model FAMS/FAMC nedrží (odvozuje je), takže v surovém stromu by po smazání
+    /// rodiny zůstaly viset.
+    /// </summary>
+    public static void RemoveFamily(GedcomDocument doc, GedcomFamily fam)
+    {
+        doc.Families.Remove(fam);
+        RemoveRecordAndReferences(doc, fam.SourceNode, fam.Id);
+    }
+
+    private static void RemoveRecordAndReferences(GedcomDocument doc, GedcomNode? record, string id)
+    {
+        if (record is not null)
+        {
+            doc.Nodes.Remove(record);
+        }
+
+        foreach (var node in doc.Nodes)
+        {
+            RemoveReferencesTo(node, id);
+        }
+
+        doc.InvalidateLookups();
+    }
+
+    /// <summary>Rekurzivně odstraní uzly, jejichž hodnota je ukazatel na daný záznam (i s podstromem).</summary>
+    private static void RemoveReferencesTo(GedcomNode node, string id)
+    {
+        node.Children.RemoveAll(c => IsPointerTo(c.Value, id));
+        foreach (var child in node.Children)
+        {
+            RemoveReferencesTo(child, id);
         }
     }
 
-    /// <summary>Odstraní uzel rodiny ze stromu.</summary>
-    public static void RemoveFamilyNode(GedcomDocument doc, GedcomFamily fam)
+    /// <summary>Hodnota musí mít tvar ukazatele „@ID@“ — prostý text shodný s ID se nemaže.</summary>
+    private static bool IsPointerTo(string value, string id)
     {
-        if (fam.SourceNode is not null)
-        {
-            doc.Nodes.Remove(fam.SourceNode);
-        }
+        var t = value.Trim();
+        return t.Length >= 2
+            && t[0] == '@'
+            && t[^1] == '@'
+            && string.Equals(t[1..^1], id, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------- pomocné
