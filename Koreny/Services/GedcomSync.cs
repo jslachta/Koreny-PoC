@@ -84,6 +84,40 @@ public static class GedcomSync
     }
 
     /// <summary>
+    /// Tagy, které v anonymizovaném záznamu osoby zůstávají: drží vazby na rodiny,
+    /// samy o osobě neříkají nic. Cokoli jiného je identifikující obsah.
+    /// </summary>
+    private static readonly string[] AnonymousIndividualTags = { "FAMC", "FAMS" };
+
+    /// <summary>
+    /// Alternativa ke smazání: záznam osoby zůstane a drží vazby, ale přijde o veškerý
+    /// identifikující obsah — potomci tak neztratí rodiče ani prarodiče, jen se stanou
+    /// dětmi neznámé osoby.
+    ///
+    /// Zahazuje se VŠE kromě FAMC/FAMS, tedy i tagy, kterým editor nerozumí (OCCU, CHR,
+    /// citace, _MHID…). Ponechat je by z „neznámé osoby" udělalo lež: uživatel vidí prázdné
+    /// políčko a v exportu by zůstalo povolání i rodné číslo. Ztráta dat je tu zamýšlená —
+    /// proti smazání celého záznamu je to pořád ta šetrnější varianta.
+    /// </summary>
+    public static void AnonymizeIndividual(GedcomDocument doc, GedcomIndividual ind)
+    {
+        ind.Name = null;
+        ind.Sex = null;
+        ind.Birth = null;
+        ind.Death = null;
+        ind.Notes.Clear();
+
+        var node = ind.SourceNode;
+        if (node is null)
+        {
+            SyncIndividual(doc, ind); // osoba vzniklá v UI a zatím neuložená do stromu
+            return;
+        }
+
+        node.Children.RemoveAll(c => Array.IndexOf(AnonymousIndividualTags, c.Tag) < 0);
+    }
+
+    /// <summary>
     /// Smaže rodinu — ze seznamu, ze stromu i z odkazů na ni (FAMS/FAMC v záznamech osob).
     /// Doménový model FAMS/FAMC nedrží (odvozuje je), takže v surovém stromu by po smazání
     /// rodiny zůstaly viset.
