@@ -342,6 +342,21 @@ textarea:focus-visible,
     color: var(--k-ink-soft);
 }
 
+/* Rozpracovaná transakce — zlatá, ne červená: není to chyba, jen stav „ještě neuloženo". */
+.k-chip--dirty {
+    background: var(--k-gold-tint);
+    color: #7A5E1E;
+    border: 1px solid var(--k-gold);
+}
+
+.k-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: var(--k-r-pill);
+    background: var(--k-gold-deep);
+    flex: 0 0 auto;
+}
+
 .k-chip b { font-weight: 700; }
 
 /* ── Plátno se stromem ──────────────────────────────────── */

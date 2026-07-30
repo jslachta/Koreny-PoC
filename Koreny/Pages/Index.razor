@@ -6,7 +6,8 @@
 @inject AppState AppState
 @inject IJSRuntime JSRuntime
 
-<PageTitle>Kořeny</PageTitle>
+@* Tečka v titulku = rozpracovaná transakce, konvence editorů (vidíš ji i na skryté záložce). *@
+<PageTitle>@(_dirty ? "• Kořeny — neuloženo" : "Kořeny")</PageTitle>
 
 <header class="k-header">
     <svg viewBox="0 0 100 100" width="46" height="46"
@@ -42,7 +43,8 @@
                 <button type="button" class="k-btn" @onclick="StartNewDocumentAsync" disabled="@(!HasAnyRecords())" title="Zahodit vše a začít s prázdným rodokmenem">Nový rodokmen</button>
                 <button type="button" class="k-btn" onclick="document.getElementById('gedcomInput').click()">Načíst GEDCOM</button>
                 <button type="button" class="k-btn" @onclick="LoadSampleGedcomAsync">Vzorová rodina</button>
-                <button type="button" class="k-btn" @onclick="ExportGedcomAsync" disabled="@(_doc is null)">Uložit GEDCOM</button>
+                @* Commit transakce; při neuložených změnách je to zvýrazněný další krok. *@
+                <button type="button" class="k-btn @(_dirty ? "k-btn--primary" : "")" @onclick="ExportGedcomAsync" disabled="@(_doc is null)">Uložit GEDCOM</button>
             </div>
 
             <div class="k-toolbar-sep" aria-hidden="true"></div>
@@ -55,6 +57,13 @@
             </div>
 
             <span class="k-spacer"></span>
+
+            @if (_dirty)
+            {
+                <span class="k-chip k-chip--dirty" role="status" title="Změny žijí jen v této záložce, dokud je neuložíte do souboru">
+                    <span class="k-dot" aria-hidden="true"></span> Neuloženo
+                </span>
+            }
 
             @if (_doc is not null && _doc.Individuals.Count > 0)
             {
@@ -434,6 +443,8 @@
     private TopolaTree? _hiddenTopolaTree;
 
     private IJSObjectReference? _exportModule;
+    private IJSObjectReference? _unsavedGuardModule;
+    private bool _unsavedGuardArmed;
 
     private enum PanelView
     {
@@ -456,6 +467,37 @@
             _pendingTopolaOverlayFocus = false;
             await _topolaOverlayRef.FocusAsync();
         }
+
+        await SyncUnsavedGuardAsync();
+    }
+
+    /// <summary>
+    /// Drží beforeunload strážce v souladu s _dirty. Synchronizuje se po renderu, aby
+    /// jednotlivá místa nastavující _dirty nemusela být async — stav je jen jeden a přepíná se tu.
+    /// </summary>
+    private async Task SyncUnsavedGuardAsync()
+    {
+        if (_dirty == _unsavedGuardArmed)
+        {
+            return;
+        }
+
+        try
+        {
+            var module = await GetUnsavedGuardModuleAsync();
+            await module.InvokeVoidAsync(_dirty ? "arm" : "disarm");
+            _unsavedGuardArmed = _dirty;
+        }
+        catch (JSDisconnectedException)
+        {
+            // Okruh je pryč (reload/zavření) — strážce už nemá co hlídat.
+        }
+    }
+
+    private async ValueTask<IJSObjectReference> GetUnsavedGuardModuleAsync()
+    {
+        _unsavedGuardModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/unsaved-guard.js");
+        return _unsavedGuardModule;
     }
 
     private void OpenTopolaOverlay()
@@ -1199,10 +1241,30 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (_exportModule is not null)
+        try
         {
-            await _exportModule.DisposeAsync();
-            _exportModule = null;
+            if (_unsavedGuardModule is not null)
+            {
+                if (_unsavedGuardArmed)
+                {
+                    await _unsavedGuardModule.InvokeVoidAsync("disarm");
+                }
+
+                await _unsavedGuardModule.DisposeAsync();
+            }
+
+            if (_exportModule is not null)
+            {
+                await _exportModule.DisposeAsync();
+            }
         }
+        catch (JSDisconnectedException)
+        {
+            // Okruh je pryč — JS strana zmizela i s posluchačem.
+        }
+
+        _unsavedGuardModule = null;
+        _unsavedGuardArmed = false;
+        _exportModule = null;
     }
 }
