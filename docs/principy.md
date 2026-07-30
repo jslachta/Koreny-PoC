@@ -88,9 +88,21 @@ zapomenout vynulovat stav.
 ## 7. Destruktivní operace se ptají a nepřekvapí
 
 Cokoli, co zahazuje práci, se ptá předem a v otázce říká, co přesně se ztratí.
+Otázka nesmí být obecná („Opravdu smazat?") — má popsat **konkrétní dopad na tento dokument**.
 
 *V kódu:* „Nový rodokmen" i „Vzorová rodina" rozlišují, zda jsou změny neuložené (nenávratně)
-nebo jen načtené ze souboru (lze načíst znovu). Zrušení dialogu nemění nic.
+nebo jen načtené ze souboru (lze načíst znovu). Smazání osoby ukáže v dialogu spočítaný dopad
+(`DeletionImpact`): z kolika rodin osoba zmizí jako rodič a jako dítě, **jmenovitě které
+potomky odřízne od jejich větve předků** a které rodiny zůstanou bez členů. Smazání rodiny se
+ptá stejně, jen jednou větou. Zrušení dialogu nemění nic.
+
+*Když je dopad velký, nabídne se šetrnější cesta.* Mazání zásadně nekaskáduje, takže osoba
+uprostřed rodokmenu za sebou nechá díru: potomci nepřijdou jen o rodiče, ale o celou jeho
+větev předků. Proto je vedle mazání volba **„zachovat jako neznámou osobu"**
+(`GedcomSync.AnonymizeIndividual`): záznam zůstane, drží všechny vazby, ale přijde o veškerý
+identifikující obsah — včetně tagů, kterým editor nerozumí. Ponechat je by z „neznámé osoby"
+udělalo lež: uživatel by viděl prázdný formulář a v exportu by zůstalo povolání i poznámka.
+Ztráta dat je tu zamýšlená; proti smazání celého záznamu je to pořád ta šetrnější varianta.
 
 ## 8. Jediný nedůvěryhodný vstup je soubor
 
