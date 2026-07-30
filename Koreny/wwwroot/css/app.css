@@ -145,6 +145,8 @@ textarea:focus-visible,
     .k-canvas { padding: 0.75rem; min-height: 260px; }
 
     .k-panel-head { padding: 0.75rem 0.85rem; }
+    .k-search { padding: 0.55rem 0.85rem; }
+    .k-status { padding: 0.5rem 0.85rem; }
     .k-panel-body { padding: 0.85rem; }
     .k-panel-body--flush { padding: 0.5rem; }
     .k-panel-foot { padding: 0.75rem 0.85rem; }
@@ -363,6 +365,52 @@ textarea:focus-visible,
 }
 
 /* ── Seznam osob ────────────────────────────────────────── */
+
+/* ── Hledání osob ───────────────────────────────────────── */
+
+.k-search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.1rem;
+    border-bottom: 1px solid var(--k-line);
+    flex-shrink: 0;
+}
+
+.k-search-icon { font-size: 0.85rem; opacity: 0.6; flex: 0 0 auto; }
+
+.k-search-input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.88rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--k-line-strong);
+    border-radius: var(--k-r-sm);
+    background: var(--k-surface);
+    color: var(--k-ink);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.k-search-input::placeholder { color: #A9B0A9; }
+.k-search-input:hover { border-color: #BDB5A3; }
+
+.k-search-input:focus {
+    outline: none;
+    border-color: var(--k-forest);
+    box-shadow: var(--k-ring);
+}
+
+/* Vlastní tlačítko × nahrazuje nativní křížek prohlížeče. */
+.k-search-input::-webkit-search-cancel-button { display: none; }
+
+.k-search-count {
+    font-size: 0.75rem;
+    color: var(--k-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
 
 .k-status {
     margin: 0;

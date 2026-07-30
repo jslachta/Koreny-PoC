@@ -129,6 +129,24 @@
                             </div>
                         }
 
+                        @if (_doc is not null && _doc.Individuals.Count > 0)
+                        {
+                            <div class="k-search">
+                                <span class="k-search-icon" aria-hidden="true">🔍</span>
+                                <input type="search"
+                                       class="k-search-input"
+                                       placeholder="Hledat jméno nebo ID…"
+                                       aria-label="Hledat osobu"
+                                       @bind="_personFilter"
+                                       @bind:event="oninput" />
+                                @if (IsPersonFilterActive())
+                                {
+                                    <span class="k-search-count">@VisiblePersonCount()/@_doc.Individuals.Count</span>
+                                    <button type="button" class="k-btn k-btn--ghost k-btn--sm" @onclick="ClearPersonFilter" title="Zrušit hledání" aria-label="Zrušit hledání">×</button>
+                                }
+                            </div>
+                        }
+
                         <p class="k-status" role="status">@((MarkupString)SelectedPersonStatusHtml())</p>
 
                         <div class="k-panel-body k-panel-body--flush">
@@ -140,10 +158,21 @@
                                     <p class="k-empty-text">Přidejte první osobu tlačítkem <strong>+ Osoba</strong>, nebo vlevo načtěte vzorovou rodinu.</p>
                                 </div>
                             }
+                            else if (VisiblePersonCount() == 0)
+                            {
+                                <div class="k-empty">
+                                    <div class="k-empty-icon" aria-hidden="true">🔍</div>
+                                    <h3 class="k-empty-title">Nikdo nenalezen</h3>
+                                    <p class="k-empty-text">Hledání „@_personFilter“ neodpovídá žádná osoba.</p>
+                                    <div class="k-empty-actions">
+                                        <button type="button" class="k-btn k-btn--outline" @onclick="ClearPersonFilter">Zrušit hledání</button>
+                                    </div>
+                                </div>
+                            }
                             else
                             {
                                 <div class="k-list">
-                                    @foreach (var p in GetIndividualsSorted())
+                                    @foreach (var p in GetVisibleIndividuals())
                                     {
                                         var rowId = p.Id;
                                         var selected = rowId == _rootPersonId;
@@ -677,6 +706,18 @@
         return $"Vybraná osoba: <strong>{name}</strong>";
     }
 
+    private string _personFilter = string.Empty;
+
+    private bool IsPersonFilterActive() => !string.IsNullOrWhiteSpace(_personFilter);
+
+    /// <summary>Seřazené osoby po aplikaci hledání (bez diakritiky a velikosti písmen, viz PersonSearch).</summary>
+    private List<GedcomIndividual> GetVisibleIndividuals() =>
+        PersonSearch.Filter(GetIndividualsSorted(), _personFilter).ToList();
+
+    private int VisiblePersonCount() => GetVisibleIndividuals().Count;
+
+    private void ClearPersonFilter() => _personFilter = string.Empty;
+
     private IEnumerable<GedcomIndividual> GetIndividualsSorted()
     {
         if (_doc is null)
@@ -1087,6 +1128,7 @@
         _doc = AppState.Document;
         _panel = PanelView.None;
         _returnToNewFamilyAfterPerson = false; // nový dokument ruší rozdělanou cestu „nová rodina"
+        _personFilter = string.Empty;          // hledání se nevztahuje k novým datům
         EnsureRootPersonId();
         EnsurePickedFamilyId();
         _dirty = false;
