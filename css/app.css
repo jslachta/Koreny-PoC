@@ -56,7 +56,13 @@ h1, h2, h3, h4 {
 
 a, .btn-link { color: var(--k-forest); }
 
-:focus-visible {
+/* Jen interaktivní prvky — globální :focus-visible jinak orámuje i nadpis nebo overlay kontejner. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex="0"]:focus-visible {
     outline: none;
     box-shadow: var(--k-ring);
     border-radius: var(--k-r-sm);
@@ -111,8 +117,43 @@ a, .btn-link { color: var(--k-forest); }
 }
 
 @media (max-width: 1100px) {
-    .k-layout { flex-direction: column; }
+    /* stretch je klíčové: s flex-start by se sloupce ve stohu smrskly na šířku obsahu
+       a karty nad sebou by měly různou šířku */
+    .k-layout { flex-direction: column; align-items: stretch; }
     .k-col-side { flex: 1 1 auto; max-width: none; width: 100%; position: static; }
+    /* Ve sloupci je panel pod stromem — ať neukrajuje celou výšku okna. */
+    .k-panel { max-height: 70vh; }
+}
+
+/* ── Mobil ──────────────────────────────────────────────── */
+
+@media (max-width: 700px) {
+    .k-app { padding: 1rem 0.85rem 1.5rem; }
+
+    .k-header { gap: 0.7rem; margin-bottom: 1rem; }
+    .k-title { font-size: 1.35rem; }
+    .k-tagline { font-size: 0.8rem; }
+
+    .k-toolbar { gap: 0.5rem; padding: 0.7rem; }
+    .k-toolbar-sep { display: none; }
+    /* Každá skupina zabere celý řádek a tlačítka si ho rovnoměrně rozdělí. */
+    .k-toolbar > .k-toolbar-group { width: 100%; }
+    .k-toolbar > .k-toolbar-group .k-btn { flex: 1 1 auto; }
+    .k-toolbar .k-spacer { display: none; }
+    .k-chip { width: 100%; justify-content: center; }
+
+    .k-canvas { padding: 0.75rem; min-height: 260px; }
+
+    .k-panel-head { padding: 0.75rem 0.85rem; }
+    .k-search { padding: 0.55rem 0.85rem; }
+    .k-status { padding: 0.5rem 0.85rem; }
+    .k-panel-body { padding: 0.85rem; }
+    .k-panel-body--flush { padding: 0.5rem; }
+    .k-panel-foot { padding: 0.75rem 0.85rem; }
+
+    .k-empty { padding: 1.5rem 1rem; }
+    .k-empty-actions { flex-direction: column; align-self: stretch; }
+    .k-empty-actions .k-btn { width: 100%; }
 }
 
 /* ── Karta / panel ──────────────────────────────────────── */
@@ -122,6 +163,7 @@ a, .btn-link { color: var(--k-forest); }
     border: 1px solid var(--k-line);
     border-radius: var(--k-r-lg);
     box-shadow: var(--k-shadow-sm);
+    min-width: 0;   /* karta se nesmí roztáhnout obsahem nad šířku sloupce */
 }
 
 .k-card + .k-card { margin-top: 1rem; }
@@ -184,6 +226,8 @@ a, .btn-link { color: var(--k-forest); }
 .k-toolbar-group {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;   /* skupina se musí umět zalomit, jinak si vynutí šířku a rozbije layout */
+    min-width: 0;
     gap: 0.4rem;
 }
 
@@ -311,7 +355,8 @@ a, .btn-link { color: var(--k-forest); }
     justify-content: center;
 }
 
-.k-canvas > svg { max-width: 100%; height: auto; }
+/* min-width: 0 — jako flex položka by se SVG jinak nesmělo zmenšit pod svou přirozenou šířku. */
+.k-canvas > svg { max-width: 100%; height: auto; min-width: 0; }
 
 .k-canvas > p {
     margin: auto;
@@ -320,6 +365,52 @@ a, .btn-link { color: var(--k-forest); }
 }
 
 /* ── Seznam osob ────────────────────────────────────────── */
+
+/* ── Hledání osob ───────────────────────────────────────── */
+
+.k-search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.1rem;
+    border-bottom: 1px solid var(--k-line);
+    flex-shrink: 0;
+}
+
+.k-search-icon { font-size: 0.85rem; opacity: 0.6; flex: 0 0 auto; }
+
+.k-search-input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.88rem;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--k-line-strong);
+    border-radius: var(--k-r-sm);
+    background: var(--k-surface);
+    color: var(--k-ink);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.k-search-input::placeholder { color: #A9B0A9; }
+.k-search-input:hover { border-color: #BDB5A3; }
+
+.k-search-input:focus {
+    outline: none;
+    border-color: var(--k-forest);
+    box-shadow: var(--k-ring);
+}
+
+/* Vlastní tlačítko × nahrazuje nativní křížek prohlížeče. */
+.k-search-input::-webkit-search-cancel-button { display: none; }
+
+.k-search-count {
+    font-size: 0.75rem;
+    color: var(--k-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
 
 .k-status {
     margin: 0;
