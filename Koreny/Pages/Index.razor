@@ -243,7 +243,7 @@
                                 <div class="k-form">
                                     <div class="k-field">
                                         <label class="k-label" for="f-husb">Manžel</label>
-                                        <select id="f-husb" class="k-select" @bind="_familyForm.HusbandId">
+                                        <select id="f-husb" class="k-select" @bind="_familyForm.HusbandId" @bind:after="OnFamilyParentsChanged">
                                             <option value="">(žádný)</option>
                                             @foreach (var p in _doc.Individuals)
                                             {
@@ -253,7 +253,7 @@
                                     </div>
                                     <div class="k-field">
                                         <label class="k-label" for="f-wife">Manželka</label>
-                                        <select id="f-wife" class="k-select" @bind="_familyForm.WifeId">
+                                        <select id="f-wife" class="k-select" @bind="_familyForm.WifeId" @bind:after="OnFamilyParentsChanged">
                                             <option value="">(žádná)</option>
                                             @foreach (var p in _doc.Individuals)
                                             {
@@ -263,17 +263,39 @@
                                     </div>
                                     <fieldset class="k-fieldset">
                                         <legend class="k-legend">Děti</legend>
-                                        <div class="k-check-list">
-                                            @foreach (var c in _doc.Individuals)
+                                        @if (!HasFamilyParentSelected())
+                                        {
+                                            @* Seznam potomků dává smysl až podle rodičů — bez nich nelze vyloučit cykly. *@
+                                            <div class="k-hint">
+                                                <span class="k-hint-icon" aria-hidden="true">👆</span>
+                                                <span>Nejdřív vyberte manžela nebo manželku. Podle nich pak nabídneme osoby, které mohou být dětmi.</span>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            var candidates = FamilyChildCandidates();
+                                            @if (candidates.Count == 0)
                                             {
-                                                var cid = c.Id;
-                                                <label class="k-check">
-                                                    <input type="checkbox" checked="@IsFamilyChildChecked(cid)" @onchange="@(e => OnFamilyChildToggle(cid, e))" />
-                                                    <span>@c.FullName</span>
-                                                    <span class="k-check-id">@cid</span>
-                                                </label>
+                                                <div class="k-hint">
+                                                    <span class="k-hint-icon" aria-hidden="true">∅</span>
+                                                    <span>Žádná osoba nemůže být dítětem této rodiny — ostatní jsou její rodiče nebo předci.</span>
+                                                </div>
                                             }
-                                        </div>
+                                            else
+                                            {
+                                                <div class="k-check-list">
+                                                    @foreach (var c in candidates)
+                                                    {
+                                                        var cid = c.Id;
+                                                        <label class="k-check">
+                                                            <input type="checkbox" checked="@IsFamilyChildChecked(cid)" @onchange="@(e => OnFamilyChildToggle(cid, e))" />
+                                                            <span>@c.FullName</span>
+                                                            <span class="k-check-id">@cid</span>
+                                                        </label>
+                                                    }
+                                                </div>
+                                            }
+                                        }
                                     </fieldset>
                                     <div class="k-field">
                                         <label class="k-label" for="f-mdate">Datum sňatku</label>
@@ -365,6 +387,9 @@
 
     private FamilyFormState _familyForm = new();
     private readonly Dictionary<string, bool> _fChildSel = new(StringComparer.Ordinal);
+
+    /// <summary>Děti, které rodina měla při otevření — zůstanou v nabídce, i kdyby dnes pravidla nesplňovaly.</summary>
+    private readonly HashSet<string> _fOriginalChildIds = new(StringComparer.Ordinal);
     private string _pickFamilyId = string.Empty;
 
     private bool _showTopolaOverlay;
@@ -843,9 +868,15 @@
         _familyForm = new FamilyFormState();
         _familyForm.Fill(f);
         _fChildSel.Clear();
+        _fOriginalChildIds.Clear();
         foreach (var p in _doc.Individuals)
         {
-            _fChildSel[p.Id] = f.ChildrenIds.Contains(p.Id);
+            var isChild = f.ChildrenIds.Contains(p.Id);
+            _fChildSel[p.Id] = isChild;
+            if (isChild)
+            {
+                _fOriginalChildIds.Add(p.Id);
+            }
         }
     }
 
@@ -853,6 +884,7 @@
     {
         _familyForm = new FamilyFormState();
         _fChildSel.Clear();
+        _fOriginalChildIds.Clear();
         if (_doc is not null)
         {
             foreach (var p in _doc.Individuals)
@@ -870,6 +902,35 @@
         if (e.Value is bool on)
         {
             _fChildSel[id] = on;
+        }
+    }
+
+    private bool HasFamilyParentSelected() =>
+        !string.IsNullOrEmpty(_familyForm.HusbandId) || !string.IsNullOrEmpty(_familyForm.WifeId);
+
+    /// <summary>Osoby nabídnutelné jako děti — bez rodičů rodiny a jejich předků (viz RelationshipRules).</summary>
+    private List<GedcomIndividual> FamilyChildCandidates() =>
+        _doc is null
+            ? new List<GedcomIndividual>()
+            : RelationshipRules.ChildCandidates(_doc, _familyForm.HusbandId, _familyForm.WifeId, _fOriginalChildIds);
+
+    /// <summary>
+    /// Po změně rodiče odškrtne děti, které by nově tvořily cyklus — typicky když se jako rodič
+    /// zvolí někdo, kdo je mezi zaškrtnutými dětmi nebo je jejich potomkem.
+    /// </summary>
+    private void OnFamilyParentsChanged()
+    {
+        if (_doc is null)
+        {
+            return;
+        }
+
+        foreach (var id in _fChildSel.Where(kv => kv.Value).Select(kv => kv.Key).ToList())
+        {
+            if (!RelationshipRules.CanBeChild(_doc, _familyForm.HusbandId, _familyForm.WifeId, id))
+            {
+                _fChildSel[id] = false;
+            }
         }
     }
 
@@ -897,8 +958,12 @@
         }
 
         // Vybrané děti v pořadí seznamu osob; SyncFamily zachová pořadí existujících CHIL uzlů.
+        // Pojistka proti cyklu: nově přidané dítě musí projít pravidly i tady, ne jen v UI.
+        // Původní děti se propouštějí, aby se import s existujícím cyklem uložením neořezal.
         _familyForm.ChildIds = _doc.Individuals
             .Where(p => _fChildSel.TryGetValue(p.Id, out var on) && on)
+            .Where(p => _fOriginalChildIds.Contains(p.Id)
+                        || RelationshipRules.CanBeChild(_doc, _familyForm.HusbandId, _familyForm.WifeId, p.Id))
             .Select(p => p.Id)
             .ToList();
         _familyForm.ApplyTo(fam);
