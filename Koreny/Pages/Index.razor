@@ -39,6 +39,7 @@
         <div class="k-card k-toolbar">
             <div class="k-toolbar-group">
                 <InputFile id="gedcomInput" OnChange="OnFileSelectedAsync" style="display:none" accept=".ged" />
+                <button type="button" class="k-btn" @onclick="StartNewDocumentAsync" disabled="@(!HasAnyRecords())" title="Zahodit vše a začít s prázdným rodokmenem">Nový rodokmen</button>
                 <button type="button" class="k-btn" onclick="document.getElementById('gedcomInput').click()">Načíst GEDCOM</button>
                 <button type="button" class="k-btn" @onclick="LoadSampleGedcomAsync">Vzorová rodina</button>
                 <button type="button" class="k-btn" @onclick="ExportGedcomAsync" disabled="@(_doc is null)">Uložit GEDCOM</button>
@@ -57,7 +58,10 @@
 
             @if (_doc is not null && _doc.Individuals.Count > 0)
             {
-                <span class="k-chip" role="status"><b>@_doc.Individuals.Count</b> osob · <b>@_doc.Families.Count</b> rodin</span>
+                <span class="k-chip" role="status">
+                    <b>@_doc.Individuals.Count</b> @Plural(_doc.Individuals.Count, "osoba", "osoby", "osob")
+                    · <b>@_doc.Families.Count</b> @Plural(_doc.Families.Count, "rodina", "rodiny", "rodin")
+                </span>
             }
         </div>
 
@@ -1122,10 +1126,44 @@
     }
 
     /// <summary>Jediný vstupní bod načtení dokumentu (upload i vzorový GEDCOM sdílejí tuto cestu).</summary>
-    private void LoadGedcomText(string text)
+    private void LoadGedcomText(string text) => ApplyDocument(Parser.Parse(text));
+
+    /// <summary>
+    /// Prázdný rodokmen „na zelené louce". Ptáme se, jen když je co ztratit; text rozlišuje,
+    /// zda jsou změny neuložené (data zmizí nenávratně) nebo jen načtené ze souboru.
+    /// </summary>
+    private async Task StartNewDocumentAsync()
     {
-        AppState.Document = Parser.Parse(text);
-        _doc = AppState.Document;
+        if (HasAnyRecords())
+        {
+            var question = _dirty
+                ? "Rozdělaný rodokmen má neuložené změny. Založením nového o ně přijdete. Pokračovat?"
+                : "Aktuální rodokmen se zavře a začnete s prázdným. Pokračovat?";
+            if (!await JSRuntime.InvokeAsync<bool>("confirm", question))
+            {
+                return;
+            }
+        }
+
+        _loadError = null;
+        ApplyDocument(new GedcomDocument());
+    }
+
+    /// <summary>Česká číslovka: 1 osoba, 2–4 osoby, 0 a 5+ osob.</summary>
+    private static string Plural(int count, string one, string few, string many) =>
+        count == 1 ? one : (count >= 2 && count <= 4 ? few : many);
+
+    private bool HasAnyRecords() =>
+        _doc is not null && (_doc.Individuals.Count > 0 || _doc.Families.Count > 0);
+
+    /// <summary>
+    /// Výměna dokumentu na jednom místě — načtení souboru, vzorová rodina i nový prázdný
+    /// rodokmen sdílejí tentýž reset, aby se nezapomněl vynulovat některý stav formulářů.
+    /// </summary>
+    private void ApplyDocument(GedcomDocument document)
+    {
+        AppState.Document = document;
+        _doc = document;
         _panel = PanelView.None;
         _returnToNewFamilyAfterPerson = false; // nový dokument ruší rozdělanou cestu „nová rodina"
         _personFilter = string.Empty;          // hledání se nevztahuje k novým datům
