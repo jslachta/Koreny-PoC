@@ -194,7 +194,7 @@
                                                     class="k-row-main"
                                                     @onclick="@(() => SelectPerson(rowId))"
                                                     aria-pressed="@(selected ? "true" : "false")">
-                                                <span class="k-row-name">@p.FullName</span>
+                                                <span class="k-row-name">@PersonDisplay.Name(p)</span>
                                                 <span class="k-row-years">@FormatLifespanYears(p)</span>
                                             </button>
                                             @if (selected)
@@ -289,7 +289,7 @@
                                             <option value="">(žádný)</option>
                                             @foreach (var p in _doc.Individuals)
                                             {
-                                                <option value="@p.Id">@p.FullName (@p.Id)</option>
+                                                <option value="@p.Id">@PersonDisplay.Name(p) (@p.Id)</option>
                                             }
                                         </select>
                                     </div>
@@ -299,7 +299,7 @@
                                             <option value="">(žádná)</option>
                                             @foreach (var p in _doc.Individuals)
                                             {
-                                                <option value="@p.Id">@p.FullName (@p.Id)</option>
+                                                <option value="@p.Id">@PersonDisplay.Name(p) (@p.Id)</option>
                                             }
                                         </select>
                                     </div>
@@ -331,7 +331,7 @@
                                                         var cid = c.Id;
                                                         <label class="k-check">
                                                             <input type="checkbox" checked="@IsFamilyChildChecked(cid)" @onchange="@(e => OnFamilyChildToggle(cid, e))" />
-                                                            <span>@c.FullName</span>
+                                                            <span>@PersonDisplay.Name(c)</span>
                                                             <span class="k-check-id">@cid</span>
                                                         </label>
                                                     }
@@ -355,7 +355,7 @@
                                 <span class="k-spacer"></span>
                                 @if (!_familyIsNew)
                                 {
-                                    <button type="button" class="k-btn k-btn--danger" @onclick="DeleteFamily">Smazat</button>
+                                    <button type="button" class="k-btn k-btn--danger" @onclick="DeleteFamilyAsync">Smazat</button>
                                 }
                             </div>
                         }
@@ -396,6 +396,92 @@
                         Document="@_doc"
                         RootPersonId="@_rootPersonId"
                         OnPersonSelected="OnTopolaPersonSelected" />
+        </div>
+    </div>
+}
+
+@* Mazání osoby: nejdřív ukázat, co se rozpadne, a nabídnout šetrnější variantu.
+   Vlastní dialog místo confirm() — potřebuje strukturovaný obsah a tři možnosti. *@
+@if (_deleteImpact is not null)
+{
+    <div class="k-modal-backdrop">
+        <div class="k-modal"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="del-title"
+             tabindex="-1"
+             @ref="_deleteDialogRef"
+             @onkeydown="OnDeleteDialogKeyDown">
+            <div class="k-modal-head">
+                <h2 class="k-modal-title" id="del-title">Smazat osobu @_deleteImpact.PersonName?</h2>
+                <p class="k-modal-sub">Ze souboru změna zmizí až uložením — dokud neuložíte, žije jen v této záložce.</p>
+            </div>
+            <div class="k-modal-body">
+                @if (!_deleteImpact.HasAnyLinks)
+                {
+                    <p class="k-impact-none">Osoba není v žádné rodině. Smazáním se v rodokmenu nic dalšího nezmění.</p>
+                }
+                else
+                {
+                    <ul class="k-impact">
+                        @if (_deleteImpact.SpouseFamilyCount > 0)
+                        {
+                            <li>
+                                <span class="k-impact-mark" aria-hidden="true">−</span>
+                                <span>Zmizí jako rodič z @_deleteImpact.SpouseFamilyCount @Plural(_deleteImpact.SpouseFamilyCount, "rodiny", "rodin", "rodin").</span>
+                            </li>
+                        }
+                        @if (_deleteImpact.ChildFamilyCount > 0)
+                        {
+                            <li>
+                                <span class="k-impact-mark" aria-hidden="true">−</span>
+                                <span>Zmizí jako dítě z @_deleteImpact.ChildFamilyCount @Plural(_deleteImpact.ChildFamilyCount, "rodiny", "rodin", "rodin").</span>
+                            </li>
+                        }
+                        @if (_deleteImpact.LosingParentNames.Count > 0)
+                        {
+                            <li>
+                                <span class="k-impact-mark" aria-hidden="true">!</span>
+                                <span>
+                                    @_deleteImpact.LosingParentNames.Count
+                                    @Plural(_deleteImpact.LosingParentNames.Count, "potomek přijde", "potomci přijdou", "potomků přijde")
+                                    o tohoto rodiče — a tím i o celou větev jeho předků:
+                                    <ul class="k-names">
+                                        @foreach (var n in _deleteImpact.LosingParentNames)
+                                        {
+                                            <li>@n</li>
+                                        }
+                                    </ul>
+                                </span>
+                            </li>
+                        }
+                        @if (_deleteImpact.EmptiedFamilyIds.Count > 0)
+                        {
+                            <li>
+                                <span class="k-impact-mark" aria-hidden="true">!</span>
+                                <span>Bez jediného člena @Plural(_deleteImpact.EmptiedFamilyIds.Count, "zůstane rodina", "zůstanou rodiny", "zůstane rodin") @string.Join(", ", _deleteImpact.EmptiedFamilyIds) — smažte ji zvlášť, pokud ji už nechcete.</span>
+                            </li>
+                        }
+                    </ul>
+
+                    <p>
+                        <strong>Zachovat jako neznámou osobu</strong> nechá v rodokmenu prázdný záznam
+                        <em>@PersonDisplay.UnknownLabel</em>, který všechny tyhle vazby drží dál. Přijdete o jméno,
+                        data i poznámky — <strong>včetně údajů, které editor neumí zobrazit</strong> — ale rodokmen
+                        se nerozpadne na kusy.
+                    </p>
+                }
+            </div>
+            <div class="k-modal-foot">
+                @if (_deleteImpact.HasAnyLinks)
+                {
+                    <button type="button" class="k-btn k-btn--primary" @onclick="KeepPersonAsUnknown">Zachovat jako neznámou osobu</button>
+                }
+                @* „úplně" dává smysl jen proti nabídnuté alternativě *@
+                <button type="button" class="k-btn k-btn--danger" @onclick="ConfirmDeletePerson">@(_deleteImpact.HasAnyLinks ? "Smazat úplně" : "Smazat")</button>
+                <span class="k-spacer"></span>
+                <button type="button" class="k-btn k-btn--ghost" @onclick="CancelDeletePerson">Zrušit</button>
+            </div>
         </div>
     </div>
 }
@@ -442,6 +528,12 @@
     private bool _downloadingTree;
     private TopolaTree? _hiddenTopolaTree;
 
+    /// <summary>Nenulové = běží dialog mazání osoby; drží spočítaný dopad na rodokmen.</summary>
+    private PersonDeletionImpact? _deleteImpact;
+    private string? _deletePersonId;
+    private ElementReference _deleteDialogRef;
+    private bool _pendingDeleteDialogFocus;
+
     private IJSObjectReference? _exportModule;
     private IJSObjectReference? _unsavedGuardModule;
     private bool _unsavedGuardArmed;
@@ -466,6 +558,12 @@
         {
             _pendingTopolaOverlayFocus = false;
             await _topolaOverlayRef.FocusAsync();
+        }
+
+        if (_pendingDeleteDialogFocus && _deleteImpact is not null)
+        {
+            _pendingDeleteDialogFocus = false;
+            await _deleteDialogRef.FocusAsync(); // aby Esc fungoval hned a čtečka dialog ohlásila
         }
 
         await SyncUnsavedGuardAsync();
@@ -748,7 +846,7 @@
             return "Vyberte osobu v seznamu.";
         }
 
-        var name = System.Net.WebUtility.HtmlEncode(sel.FullName);
+        var name = System.Net.WebUtility.HtmlEncode(PersonDisplay.Name(sel));
         return $"Vybraná osoba: <strong>{name}</strong>";
     }
 
@@ -873,21 +971,81 @@
         StateHasChanged();
     }
 
+    /// <summary>
+    /// Mazání se nikdy neprovede rovnou: nejdřív se spočítá dopad na zbytek rodokmenu
+    /// a uživatel ho vidí v dialogu (docs/principy.md, princip 7).
+    /// </summary>
     private void DeletePerson()
     {
-        if (_doc is null || _personIsNew || string.IsNullOrEmpty(_editPersonId))
+        var ind = PersonBeingEdited();
+        if (ind is null)
         {
             return;
         }
 
-        var ind = _doc.Individuals.FirstOrDefault(x => x.Id == _editPersonId);
-        if (ind is not null)
+        _deletePersonId = ind.Id;
+        _deleteImpact = DeletionImpact.ForPerson(_doc!, ind);
+        _pendingDeleteDialogFocus = true;
+    }
+
+    private GedcomIndividual? PersonBeingEdited()
+    {
+        if (_doc is null || _personIsNew || string.IsNullOrEmpty(_editPersonId))
         {
-            GedcomSync.RemoveIndividual(_doc, ind); // včetně HUSB/WIFE/CHIL odkazů na ni
+            return null;
         }
 
+        return _doc.Individuals.FirstOrDefault(x => x.Id == _editPersonId);
+    }
+
+    private void CancelDeletePerson()
+    {
+        _deleteImpact = null;
+        _deletePersonId = null;
+    }
+
+    private void OnDeleteDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            CancelDeletePerson();
+        }
+    }
+
+    private void ConfirmDeletePerson()
+    {
+        var ind = PersonToDelete();
+        if (ind is not null)
+        {
+            GedcomSync.RemoveIndividual(_doc!, ind); // včetně HUSB/WIFE/CHIL odkazů na ni
+            FinishPersonDeletion();
+        }
+    }
+
+    /// <summary>Šetrnější varianta: záznam i vazby zůstanou, zmizí jen identita.</summary>
+    private void KeepPersonAsUnknown()
+    {
+        var ind = PersonToDelete();
+        if (ind is not null)
+        {
+            GedcomSync.AnonymizeIndividual(_doc!, ind);
+            FinishPersonDeletion();
+        }
+    }
+
+    /// <summary>Osoba, které se dialog týká — čte se z ID, ne z reference, aby prošla i změna dokumentu mezitím.</summary>
+    private GedcomIndividual? PersonToDelete() =>
+        _doc is null || string.IsNullOrEmpty(_deletePersonId)
+            ? null
+            : _doc.Individuals.FirstOrDefault(x => x.Id == _deletePersonId);
+
+    private void FinishPersonDeletion()
+    {
+        var removedId = _deletePersonId;
+        CancelDeletePerson();
+
         _dirty = true;
-        if (_rootPersonId == _editPersonId)
+        if (_rootPersonId == removedId && _doc?.FindIndividual(removedId) is null)
         {
             _rootPersonId = null;
         }
@@ -1040,7 +1198,11 @@
         StateHasChanged();
     }
 
-    private void DeleteFamily()
+    /// <summary>
+    /// Smazání rodiny osoby nemaže, ale trhá vazby mezi nimi — a to se nesmí stát potichu
+    /// (docs/principy.md, princip 7). Prostý confirm stačí: dopad je jedna věta, ne seznam.
+    /// </summary>
+    private async Task DeleteFamilyAsync()
     {
         if (_doc is null || _familyIsNew || string.IsNullOrEmpty(_editFamilyId))
         {
@@ -1050,6 +1212,11 @@
         var fam = _doc.Families.FirstOrDefault(x => x.Id == _editFamilyId);
         if (fam is not null)
         {
+            if (!await JSRuntime.InvokeAsync<bool>("confirm", DeleteFamilyQuestion(fam)))
+            {
+                return;
+            }
+
             GedcomSync.RemoveFamily(_doc, fam); // včetně FAMS/FAMC odkazů na ni
         }
 
@@ -1057,6 +1224,21 @@
         _panel = PanelView.None;
         EnsurePickedFamilyId();
         StateHasChanged();
+    }
+
+    private string DeleteFamilyQuestion(GedcomFamily fam)
+    {
+        var parents = new[] { fam.HusbandId, fam.WifeId }.Count(id => !string.IsNullOrEmpty(id));
+        var kids = fam.ChildrenIds.Count;
+
+        if (kids == 0)
+        {
+            return "Smazat rodinu? Osoby zůstanou, zmizí jen jejich vzájemná vazba.";
+        }
+
+        return $"Smazat rodinu? Osoby zůstanou v rodokmenu, ale {kids} "
+            + $"{Plural(kids, "dítě přijde", "děti přijdou", "dětí přijde")} o vazbu na "
+            + $"{Plural(parents, "svého rodiče", "své rodiče", "své rodiče")}.";
     }
 
     private void CancelPanel()
@@ -1182,6 +1364,7 @@
         AppState.Document = document;
         _doc = document;
         _panel = PanelView.None;
+        CancelDeletePerson();                  // dialog se týkal osoby, která už tu není
         _returnToNewFamilyAfterPerson = false; // nový dokument ruší rozdělanou cestu „nová rodina"
         _personFilter = string.Empty;          // hledání se nevztahuje k novým datům
         EnsureRootPersonId();

@@ -675,6 +675,111 @@ textarea:focus-visible,
 
 .k-overlay-body { flex: 1; min-height: 0; position: relative; }
 
+/* ── Modální dialog (destruktivní operace) ───────────────── */
+
+.k-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(28, 35, 32, .42);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.k-modal {
+    width: min(34rem, 100%);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--k-surface);
+    border: 1px solid var(--k-line);
+    border-radius: var(--k-r-lg);
+    box-shadow: var(--k-shadow-lg);
+    outline: none;
+}
+
+.k-modal-head {
+    padding: 1rem 1.25rem 0.75rem;
+    border-bottom: 1px solid var(--k-line);
+}
+
+.k-modal-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+
+.k-modal-sub {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: var(--k-muted);
+}
+
+.k-modal-body {
+    padding: 1rem 1.25rem;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    color: var(--k-ink-soft);
+}
+
+.k-modal-body > * + * { margin-top: 0.75rem; }
+
+.k-modal-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem 1rem;
+    border-top: 1px solid var(--k-line);
+}
+
+/* Náhled dopadu: co přesně se v dokumentu změní. */
+.k-impact {
+    margin: 0;
+    padding: 0.7rem 0.9rem;
+    list-style: none;
+    background: var(--k-gold-tint);
+    border: 1px solid var(--k-gold);
+    border-radius: var(--k-r-md);
+}
+
+.k-impact li {
+    display: flex;
+    gap: 0.55rem;
+    align-items: baseline;
+    line-height: 1.45;
+}
+
+.k-impact li + li { margin-top: 0.35rem; }
+
+.k-impact-mark {
+    flex: 0 0 auto;
+    color: var(--k-gold-deep);
+    font-weight: 700;
+}
+
+.k-impact-none {
+    padding: 0.7rem 0.9rem;
+    background: var(--k-forest-soft);
+    border: 1px solid var(--k-line);
+    border-radius: var(--k-r-md);
+    color: var(--k-ink-soft);
+}
+
+.k-names {
+    margin: 0.15rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--k-ink);
+}
+
+.k-names li { display: inline; }
+.k-names li + li::before { content: ", "; }
+
 /* ── Blazor systémové UI (přebarveno do palety) ──────────── */
 
 .validation-message { color: var(--k-danger); }

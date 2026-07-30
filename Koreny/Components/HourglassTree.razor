@@ -530,7 +530,7 @@ else
             Id = i.Id,
             CenterX = centerX,
             CenterY = centerY,
-            FullName = string.IsNullOrWhiteSpace(i.FullName) ? i.Id : i.FullName,
+            FullName = PersonDisplay.Name(i),
             Lifespan = FormatLifespan(i),
         };
 
