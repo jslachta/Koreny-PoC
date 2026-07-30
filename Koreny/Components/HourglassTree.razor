@@ -9,7 +9,10 @@
 else
 {
     
-    <svg width="@_svgWidth" height="@_svgHeight" xmlns="http://www.w3.org/2000/svg" style="display: block; max-width: 100%; height: auto;">
+    @* viewBox je nutný, aby se strom při zúžení stránky ZMENŠIL (bez něj max-width jen ořízne rám).
+       Rozměry přes F() = invariantní kultura; na české lokalizaci by desetinná čárka atribut rozbila. *@
+    <svg viewBox="0 0 @F(_svgWidth) @F(_svgHeight)" width="@F(_svgWidth)" height="@F(_svgHeight)"
+         xmlns="http://www.w3.org/2000/svg" style="display: block; max-width: 100%; height: auto;">
         <g stroke="@LinkColor" stroke-width="1.25" fill="none">
             @foreach (var seg in _segments)
             {
@@ -275,7 +278,8 @@ else
     private string BuildSvgMarkup()
     {
         var sb = new System.Text.StringBuilder();
-        sb.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"").Append(F(_svgWidth)).Append("\" height=\"").Append(F(_svgHeight)).Append("\" style=\"display:block;max-width:100%;height:auto\">");
+        sb.Append("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ").Append(F(_svgWidth)).Append(' ').Append(F(_svgHeight))
+          .Append("\" width=\"").Append(F(_svgWidth)).Append("\" height=\"").Append(F(_svgHeight)).Append("\" style=\"display:block;max-width:100%;height:auto\">");
         sb.Append("<rect x=\"0\" y=\"0\" width=\"").Append(F(_svgWidth)).Append("\" height=\"").Append(F(_svgHeight)).Append("\" fill=\"#FFFFFF\"/>");
         sb.Append("<g stroke=\"").Append(LinkColor).Append("\" stroke-width=\"1.25\" fill=\"none\">");
         foreach (var seg in _segments)

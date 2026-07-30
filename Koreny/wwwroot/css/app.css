@@ -353,7 +353,8 @@ textarea:focus-visible,
     justify-content: center;
 }
 
-.k-canvas > svg { max-width: 100%; height: auto; }
+/* min-width: 0 — jako flex položka by se SVG jinak nesmělo zmenšit pod svou přirozenou šířku. */
+.k-canvas > svg { max-width: 100%; height: auto; min-width: 0; }
 
 .k-canvas > p {
     margin: auto;
