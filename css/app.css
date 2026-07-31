@@ -68,6 +68,13 @@ textarea:focus-visible,
     border-radius: var(--k-r-sm);
 }
 
+/* Cíle programového fokusu — nadpis (FocusOnNavigate kvůli čtečkám), overlay, dialog.
+   Tabem se na ně dostat nedá, takže prstenec nikoho nenaviguje; jen by tvrdil,
+   že se s nadpisem dá něco dělat, a nutil uživatele odkliknout ho pryč. */
+[tabindex="-1"]:focus {
+    outline: none;
+}
+
 /* ── App shell ──────────────────────────────────────────── */
 
 .k-app {
