@@ -1,0 +1,288 @@
+@using Koreny.Models
+@using Koreny.Services
+
+@* Formulář rodiny. Stav (FamilyFormState, zaškrtnutí dětí, původní děti) vlastní stránka
+   a sem chodí jako parametry — jsou to referenční typy, takže se mutují tytéž objekty,
+   ze kterých si stránka počítá otisk pro stráž rozepsaného formuláře.
+
+   Vlastní jsou tu jen tři hledané výrazy: jsou to stavy pohledu a komponenta žije jen po dobu
+   otevřeného formuláře, takže se zavřením přirozeně zanikají. *@
+
+<div class="k-panel-head">
+    <h2 class="k-panel-title">@(IsNew ? "Nová rodina" : "Upravit rodinu")</h2>
+</div>
+@if (Document is null || Document.Individuals.Count == 0)
+{
+    <div class="k-panel-body">
+        <div class="k-empty">
+            <div class="k-empty-icon" aria-hidden="true">👤</div>
+            <h3 class="k-empty-title">Nejdřív potřebujeme aspoň jednu osobu</h3>
+            <p class="k-empty-text">Rodina spojuje dvě osoby, které zatím nemáte. Přidejte první osobu — a vrátíme vás rovnou sem.</p>
+            <div class="k-empty-actions">
+                <button type="button" class="k-btn k-btn--primary" @onclick="OnAddPersonFirst">Přidat osobu</button>
+                <button type="button" class="k-btn k-btn--outline" @onclick="OnCancel">Zpět</button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="k-panel-body">
+        <div class="k-form">
+            @* @key na selectech je nutnost, ne kosmetika: když se přepíše nabídka
+               <option>, prohlížeč selectu vynuluje hodnotu a Blazor ji sám znovu
+               nenastaví — vybraný rodič by tiše zmizel na „(žádný)". Klíč z filtru
+               a z vybraného ID donutí Blazor postavit select znovu i s hodnotou. *@
+            <div class="k-field">
+                <label class="k-label" for="f-husb">Manžel</label>
+                @{
+                    var husbands = ParentOptions(_husbandFilter, Form.HusbandId);
+                }
+                @if (ShowFilter)
+                {
+                    <div class="k-filter">
+                        <span class="k-filter-icon" aria-hidden="true">🔍</span>
+                        <input type="search" class="k-filter-input" placeholder="Zúžit nabídku…"
+                               aria-label="Hledat mezi manžely" @bind="_husbandFilter" @bind:event="oninput" />
+                        <span class="k-filter-count">@husbands.Count/@Document.Individuals.Count</span>
+                    </div>
+                }
+                <select id="f-husb" class="k-select" @key="@($"husb-{_husbandFilter}-{Form.HusbandId}")" @bind="Form.HusbandId" @bind:after="ParentsChangedAsync">
+                    <option value="">(žádný)</option>
+                    @foreach (var p in husbands)
+                    {
+                        <option value="@p.Id">@PersonDisplay.Name(p) · @PersonDisplay.LifespanYears(p) (@p.Id)</option>
+                    }
+                </select>
+            </div>
+            <div class="k-field">
+                <label class="k-label" for="f-wife">Manželka</label>
+                @{
+                    var wives = ParentOptions(_wifeFilter, Form.WifeId);
+                }
+                @if (ShowFilter)
+                {
+                    <div class="k-filter">
+                        <span class="k-filter-icon" aria-hidden="true">🔍</span>
+                        <input type="search" class="k-filter-input" placeholder="Zúžit nabídku…"
+                               aria-label="Hledat mezi manželkami" @bind="_wifeFilter" @bind:event="oninput" />
+                        <span class="k-filter-count">@wives.Count/@Document.Individuals.Count</span>
+                    </div>
+                }
+                <select id="f-wife" class="k-select" @key="@($"wife-{_wifeFilter}-{Form.WifeId}")" @bind="Form.WifeId" @bind:after="ParentsChangedAsync">
+                    <option value="">(žádná)</option>
+                    @foreach (var p in wives)
+                    {
+                        <option value="@p.Id">@PersonDisplay.Name(p) · @PersonDisplay.LifespanYears(p) (@p.Id)</option>
+                    }
+                </select>
+            </div>
+            <fieldset class="k-fieldset">
+                <legend class="k-legend">Děti</legend>
+                @if (!HasParentSelected)
+                {
+                    @* Seznam potomků dává smysl až podle rodičů — bez nich nelze vyloučit cykly. *@
+                    <div class="k-hint">
+                        <span class="k-hint-icon" aria-hidden="true">👆</span>
+                        <span>Nejdřív vyberte manžela nebo manželku. Podle nich pak nabídneme osoby, které mohou být dětmi.</span>
+                    </div>
+                }
+                else
+                {
+                    var candidates = ChildCandidates();
+                    @if (candidates.Count == 0)
+                    {
+                        <div class="k-hint">
+                            <span class="k-hint-icon" aria-hidden="true">∅</span>
+                            <span>Žádná osoba nemůže být dítětem této rodiny — ostatní jsou její rodiče nebo předci.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        var visibleChildren = VisibleChildCandidates(candidates);
+                        @if (candidates.Count > PersonFilterThreshold)
+                        {
+                            <div class="k-filter">
+                                <span class="k-filter-icon" aria-hidden="true">🔍</span>
+                                <input type="search" class="k-filter-input" placeholder="Hledat mezi dětmi…"
+                                       aria-label="Hledat mezi možnými dětmi" @bind="_childFilter" @bind:event="oninput" />
+                                <span class="k-filter-count">@visibleChildren.Count/@candidates.Count</span>
+                            </div>
+                        }
+
+                        @if (visibleChildren.Count == 0)
+                        {
+                            <div class="k-hint">
+                                <span class="k-hint-icon" aria-hidden="true">🔍</span>
+                                <span>Hledání „@_childFilter“ neodpovídá žádná osoba, která může být dítětem této rodiny.</span>
+                            </div>
+                        }
+                        else
+                        {
+                            var pinned = PinnedChildCount(visibleChildren);
+                            <div class="k-check-list">
+                                @for (var ci = 0; ci < visibleChildren.Count; ci++)
+                                {
+                                    var c = visibleChildren[ci];
+                                    var cid = c.Id;
+                                    <label class="k-check">
+                                        <input type="checkbox" checked="@IsChildChecked(cid)" @onchange="@(e => ToggleChild(cid, e))" />
+                                        <span class="k-check-name">@PersonDisplay.Name(c)</span>
+                                        @* Jmenovci jsou v rodokmenu pravidlo, ne výjimka — bez let se nedají rozlišit. *@
+                                        <span class="k-check-years">@PersonDisplay.LifespanYears(c)</span>
+                                        <span class="k-check-id">@cid</span>
+                                    </label>
+
+                                    @* Bez linky by připnuté děti vypadaly jako rozbitá abeceda. *@
+                                    if (ci == pinned - 1 && pinned < visibleChildren.Count)
+                                    {
+                                        <div class="k-check-sep" aria-hidden="true"></div>
+                                    }
+                                }
+                            </div>
+                        }
+
+                        @if (CheckedChildCount > 0)
+                        {
+                            <p class="k-check-summary" role="status">
+                                Vybráno @CheckedChildCount @Czech.Plural(CheckedChildCount, "dítě", "děti", "dětí").
+                                Zaškrtnuté zůstávají v seznamu i při hledání.
+                            </p>
+                        }
+                    }
+                }
+            </fieldset>
+            <div class="k-field">
+                <label class="k-label" for="f-mdate">Datum sňatku</label>
+                <input id="f-mdate" class="k-input" @bind="Form.MarriageDate" placeholder="např. 15 JUN 1925" />
+            </div>
+            <div class="k-field">
+                <label class="k-label" for="f-mplace">Místo sňatku</label>
+                <input id="f-mplace" class="k-input" @bind="Form.MarriagePlace" />
+            </div>
+        </div>
+    </div>
+    <div class="k-panel-foot">
+        <button type="button" class="k-btn k-btn--primary" @onclick="OnSave">Uložit</button>
+        <button type="button" class="k-btn k-btn--ghost" @onclick="OnCancel">Zrušit</button>
+        <span class="k-spacer"></span>
+        @if (!IsNew)
+        {
+            <button type="button" class="k-btn k-btn--danger" @onclick="OnDelete">Smazat</button>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>
+    /// Od kolika osob má smysl nabízet hledání. Pod tuhle mez je filtr jen prázdné pole navíc,
+    /// nad ni se v rozbalovací nabídce ztratíš — a přesně o to v rodokmenu o pár stech lidech jde.
+    /// </summary>
+    private const int PersonFilterThreshold = 10;
+
+    private string _husbandFilter = string.Empty;
+    private string _wifeFilter = string.Empty;
+    private string _childFilter = string.Empty;
+
+    [Parameter, EditorRequired]
+    public GedcomDocument? Document { get; set; }
+
+    /// <summary>Editovaný stav. Mutuje se přímo — vlastníkem zůstává stránka.</summary>
+    [Parameter, EditorRequired]
+    public FamilyFormState Form { get; set; } = null!;
+
+    /// <summary>Zaškrtnutí dětí podle ID osoby; drží ho stránka, protože z něj skládá i otisk formuláře.</summary>
+    [Parameter, EditorRequired]
+    public Dictionary<string, bool> ChildSelection { get; set; } = null!;
+
+    /// <summary>Děti, které rodina měla při otevření — zůstanou v nabídce a připínají se nahoru.</summary>
+    [Parameter, EditorRequired]
+    public HashSet<string> OriginalChildIds { get; set; } = null!;
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    /// <summary>Po změně rodiče je nutné přepočítat, kdo smí být dítětem (cykly).</summary>
+    [Parameter]
+    public EventCallback OnParentsChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    /// <summary>Prázdný dokument: „Přidat osobu" odskočí do formuláře osoby a vrátí se sem.</summary>
+    [Parameter]
+    public EventCallback OnAddPersonFirst { get; set; }
+
+    /// <summary>@bind:after chce metodu, ne EventCallback — proto tenhle převod.</summary>
+    private Task ParentsChangedAsync() => OnParentsChanged.InvokeAsync();
+
+    private bool ShowFilter => Document is not null && Document.Individuals.Count > PersonFilterThreshold;
+
+    private bool HasParentSelected =>
+        !string.IsNullOrEmpty(Form.HusbandId) || !string.IsNullOrEmpty(Form.WifeId);
+
+    private int CheckedChildCount => ChildSelection.Count(kv => kv.Value);
+
+    private bool IsChildChecked(string id) => ChildSelection.TryGetValue(id, out var v) && v;
+
+    private void ToggleChild(string id, ChangeEventArgs e)
+    {
+        if (e.Value is bool on)
+        {
+            ChildSelection[id] = on;
+        }
+    }
+
+    /// <summary>
+    /// Osoby v nabídce rodiče, seřazené jako seznam osob a zúžené hledáním. Právě zvolená osoba
+    /// je v seznamu VŽDY — kdyby ji filtr vyhodil, select by ukázal prázdno a tvrdil tím,
+    /// že rodič není vyplněný.
+    /// </summary>
+    private List<GedcomIndividual> ParentOptions(string filter, string? selectedId) =>
+        Sorted(Document!.Individuals)
+            .Where(p => (!string.IsNullOrEmpty(selectedId) && p.Id == selectedId) || PersonSearch.Matches(p, filter))
+            .ToList();
+
+    /// <summary>
+    /// Kandidáti na děti podle pravidel. Nahoře jsou děti, které rodina měla při otevření
+    /// formuláře, pod nimi zbytek abecedně jako v seznamu osob (pořadí ze souboru se
+    /// v dlouhém seznamu hledá hůř).
+    ///
+    /// Připíná se podle stavu PŘI OTEVŘENÍ, ne podle živého zaškrtnutí: kdyby se řadilo živě,
+    /// každé kliknutí by odskočilo řádek nahoru a přeuspořádalo seznam pod kurzorem. Takhle
+    /// pořadí drží po celou editaci a znamená něco stálého — „současné děti téhle rodiny".
+    ///
+    /// Do uloženého pořadí CHIL to nemluví, to si stránka bere z dokumentu.
+    /// </summary>
+    private List<GedcomIndividual> ChildCandidates()
+    {
+        var candidates = RelationshipRules.ChildCandidates(Document!, Form.HusbandId, Form.WifeId, OriginalChildIds);
+        return Sorted(candidates.OrderByDescending(p => OriginalChildIds.Contains(p.Id))).ToList();
+    }
+
+    /// <summary>
+    /// Děti k zobrazení: co odpovídá hledání, plus všechno zaškrtnuté. Zaškrtnuté dítě nesmí
+    /// hledáním zmizet — uživatel by nevěděl, co má vlastně vybráno, a odškrtnout by to nešlo.
+    /// </summary>
+    private List<GedcomIndividual> VisibleChildCandidates(List<GedcomIndividual> candidates) =>
+        candidates
+            .Where(c => IsChildChecked(c.Id) || PersonSearch.Matches(c, _childFilter))
+            .ToList();
+
+    /// <summary>Kolik z právě zobrazených řádků je připnutých — za ně patří dělicí linka.</summary>
+    private int PinnedChildCount(List<GedcomIndividual> visible) =>
+        visible.Count(c => OriginalChildIds.Contains(c.Id));
+
+    private static IOrderedEnumerable<GedcomIndividual> Sorted(IEnumerable<GedcomIndividual> people) =>
+        people is IOrderedEnumerable<GedcomIndividual> ordered
+            ? ordered.ThenBy(p => p.Name?.Surname ?? "", StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(p => p.Name?.GivenName ?? "", StringComparer.OrdinalIgnoreCase)
+            : people.OrderBy(p => p.Name?.Surname ?? "", StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(p => p.Name?.GivenName ?? "", StringComparer.OrdinalIgnoreCase);
+}

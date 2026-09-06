@@ -1,0 +1,82 @@
+@using Koreny.Services
+
+@* Formulář osoby. Stav drží PersonFormState, který sem přichází z Index.razor jako parametr —
+   je to referenční typ, takže @bind mění tentýž objekt, ze kterého si stránka počítá otisk
+   pro stráž rozepsaného formuláře. Komponenta tak nemá vlastní stav a nemůže se s ním rozejít. *@
+
+<div class="k-panel-head">
+    <h2 class="k-panel-title">@(IsNew ? "Nová osoba" : "Upravit osobu")</h2>
+</div>
+<div class="k-panel-body">
+    <div class="k-form">
+        <div class="k-field">
+            <label class="k-label" for="p-given">Jméno</label>
+            <input id="p-given" class="k-input" @bind="Form.Given" />
+        </div>
+        <div class="k-field">
+            <label class="k-label" for="p-surname">Příjmení</label>
+            <input id="p-surname" class="k-input" @bind="Form.Surname" />
+        </div>
+        <div class="k-field">
+            <label class="k-label" for="p-maiden">Rodné příjmení</label>
+            <input id="p-maiden" class="k-input" @bind="Form.MaidenSurname" placeholder="např. Svobodová" />
+            <p class="k-hint-text">Příjmení před sňatkem. Ukládá se jako samostatné jméno s typem <code>maiden</code>, jak to popisuje GEDCOM 5.5.1.</p>
+        </div>
+        <div class="k-field">
+            <label class="k-label" for="p-sex">Pohlaví</label>
+            <select id="p-sex" class="k-select" @bind="Form.SexCode">
+                <option value="0">Neznámé</option>
+                <option value="1">Muž</option>
+                <option value="2">Žena</option>
+            </select>
+        </div>
+        <div class="k-field">
+            <label class="k-label" for="p-bdate">Datum narození</label>
+            <input id="p-bdate" class="k-input" @bind="Form.BirthDate" placeholder="např. 3 MAR 1901" />
+        </div>
+        <div class="k-field">
+            <label class="k-label" for="p-bplace">Místo narození</label>
+            <input id="p-bplace" class="k-input" @bind="Form.BirthPlace" />
+        </div>
+        <div class="k-field">
+            <label class="k-label" for="p-ddate">Datum úmrtí</label>
+            <input id="p-ddate" class="k-input" @bind="Form.DeathDate" placeholder="např. 1 MAR 1980" />
+        </div>
+        <div class="k-field">
+            <label class="k-label" for="p-dplace">Místo úmrtí</label>
+            <input id="p-dplace" class="k-input" @bind="Form.DeathPlace" />
+        </div>
+        <div class="k-field">
+            <label class="k-label" for="p-note">Poznámka</label>
+            <input id="p-note" class="k-input" @bind="Form.NoteFirst" />
+        </div>
+    </div>
+</div>
+<div class="k-panel-foot">
+    <button type="button" class="k-btn k-btn--primary" @onclick="OnSave">Uložit</button>
+    <button type="button" class="k-btn k-btn--ghost" @onclick="OnCancel">Zrušit</button>
+    <span class="k-spacer"></span>
+    @if (!IsNew)
+    {
+        <button type="button" class="k-btn k-btn--danger" @onclick="OnDelete">Smazat</button>
+    }
+</div>
+
+@code {
+    /// <summary>Editovaný stav. Mutuje se přímo — vlastníkem zůstává stránka.</summary>
+    [Parameter, EditorRequired]
+    public PersonFormState Form { get; set; } = null!;
+
+    /// <summary>Nová osoba nemá co mazat, takže se tlačítko Smazat neukazuje.</summary>
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    [Parameter]
+    public EventCallback OnSave { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+}

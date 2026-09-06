@@ -1,0 +1,145 @@
+@using Koreny.Models
+@using Koreny.Services
+
+@* Seznam osob: hledání, stavový řádek, řádky. Řazení i filtrování je tady, protože nikdo jiný
+   je nepotřebuje — hledaný výraz ale vlastní stránka, aby ho načtení nového dokumentu vynulovalo. *@
+
+<div class="k-panel-head">
+    <h2 class="k-panel-title">Osoby</h2>
+    <div class="k-toolbar-group">
+        <button type="button" class="k-btn k-btn--sm" @onclick="OnNew" disabled="@(Document is null)">+ Osoba</button>
+    </div>
+</div>
+
+@if (HasPeople)
+{
+    <div class="k-search">
+        <span class="k-search-icon" aria-hidden="true">🔍</span>
+        <input type="search"
+               class="k-search-input"
+               placeholder="Hledat jméno nebo ID…"
+               aria-label="Hledat osobu"
+               @bind="FilterValue"
+               @bind:event="oninput" />
+        @if (IsFilterActive)
+        {
+            <span class="k-search-count">@Visible.Count/@Document!.Individuals.Count</span>
+            <button type="button" class="k-btn k-btn--ghost k-btn--sm" @onclick="ClearFilterAsync" title="Zrušit hledání" aria-label="Zrušit hledání">×</button>
+        }
+    </div>
+}
+
+@* Jméno z dokumentu jde do stránky jako text, ne jako HTML (princip 8). *@
+<p class="k-status" role="status">
+    @if (!HasPeople)
+    {
+        <text>Zatím žádné osoby.</text>
+    }
+    else if (Selected is { } selectedPerson)
+    {
+        <text>Vybraná osoba: </text>
+
+        <strong>@PersonDisplay.Name(selectedPerson)</strong>
+    }
+    else
+    {
+        <text>Vyberte osobu v seznamu.</text>
+    }
+</p>
+
+<div class="k-panel-body k-panel-body--flush">
+    @if (!HasPeople)
+    {
+        <div class="k-empty">
+            <div class="k-empty-icon" aria-hidden="true">🌱</div>
+            <h3 class="k-empty-title">Zatím tu nikdo není</h3>
+            <p class="k-empty-text">Přidejte první osobu tlačítkem <strong>+ Osoba</strong>, nebo vlevo načtěte vzorovou rodinu.</p>
+        </div>
+    }
+    else if (Visible.Count == 0)
+    {
+        <div class="k-empty">
+            <div class="k-empty-icon" aria-hidden="true">🔍</div>
+            <h3 class="k-empty-title">Nikdo nenalezen</h3>
+            <p class="k-empty-text">Hledání „@Filter“ neodpovídá žádná osoba.</p>
+            <div class="k-empty-actions">
+                <button type="button" class="k-btn k-btn--outline" @onclick="ClearFilterAsync">Zrušit hledání</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="k-list">
+            @foreach (var p in Visible)
+            {
+                var rowId = p.Id;
+                var selected = rowId == SelectedId;
+                <div class="k-row @(selected ? "is-selected" : "")">
+                    <button type="button"
+                            class="k-row-main"
+                            @onclick="@(() => OnSelect.InvokeAsync(rowId))"
+                            aria-pressed="@(selected ? "true" : "false")">
+                        <span class="k-row-name">@PersonDisplay.Name(p)</span>
+                        <span class="k-row-years">@PersonDisplay.LifespanYears(p)</span>
+                    </button>
+                    @if (selected)
+                    {
+                        <button type="button" class="k-btn k-btn--sm k-btn--outline" @onclick="@(() => OnEdit.InvokeAsync(rowId))" title="Upravit vybranou osobu">Upravit</button>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public GedcomDocument? Document { get; set; }
+
+    /// <summary>Vybraná osoba = kořen rodokmenu; drží ji stránka, protože ji řídí i strom.</summary>
+    [Parameter]
+    public string? SelectedId { get; set; }
+
+    [Parameter]
+    public string Filter { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> FilterChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnSelect { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnEdit { get; set; }
+
+    [Parameter]
+    public EventCallback OnNew { get; set; }
+
+    private bool HasPeople => Document is not null && Document.Individuals.Count > 0;
+
+    private bool IsFilterActive => !string.IsNullOrWhiteSpace(Filter);
+
+    private string FilterValue
+    {
+        get => Filter;
+        set => FilterChanged.InvokeAsync(value);
+    }
+
+    /// <summary>Seřazené osoby po aplikaci hledání (bez diakritiky a velikosti písmen, viz PersonSearch).</summary>
+    private List<GedcomIndividual> Visible =>
+        Document is null
+            ? new List<GedcomIndividual>()
+            : PersonSearch.Filter(Sorted, Filter).ToList();
+
+    private IEnumerable<GedcomIndividual> Sorted =>
+        Document!.Individuals
+            .OrderBy(p => p.Name?.Surname ?? "", StringComparer.OrdinalIgnoreCase)
+            .ThenBy(p => p.Name?.GivenName ?? "", StringComparer.OrdinalIgnoreCase);
+
+    private GedcomIndividual? Selected =>
+        Document is null || string.IsNullOrEmpty(SelectedId)
+            ? null
+            : Document.Individuals.FirstOrDefault(x => x.Id == SelectedId);
+
+    private Task ClearFilterAsync() => FilterChanged.InvokeAsync(string.Empty);
+}

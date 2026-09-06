@@ -1,0 +1,127 @@
+@using Koreny.Services
+@using Microsoft.AspNetCore.Components.Web
+
+@* Mazání osoby: nejdřív ukázat, co se rozpadne, a nabídnout šetrnější variantu.
+   Vlastní dialog místo confirm() — potřebuje strukturovaný obsah a tři možnosti.
+
+   Komponenta je čistě zobrazovací: dopad si spočítá volající (DeletionImpact) a rozhodnutí
+   posílá ven. Sama si řeší jen fokus a Esc, protože obojí patří k dialogu, ne ke stránce. *@
+
+<div class="k-modal-backdrop">
+    <div class="k-modal"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="del-title"
+         tabindex="-1"
+         @ref="_dialogRef"
+         @onkeydown="OnKeyDown">
+        <div class="k-modal-head">
+            <h2 class="k-modal-title" id="del-title">Smazat osobu @Impact.PersonName?</h2>
+            <p class="k-modal-sub">Ze souboru změna zmizí až uložením — dokud neuložíte, žije jen v této záložce.</p>
+        </div>
+        <div class="k-modal-body">
+            @if (!Impact.HasAnyLinks)
+            {
+                <p class="k-impact-none">Osoba není v žádné rodině. Smazáním se v rodokmenu nic dalšího nezmění.</p>
+            }
+            else
+            {
+                <ul class="k-impact">
+                    @if (Impact.SpouseFamilyCount > 0)
+                    {
+                        <li>
+                            <span class="k-impact-mark" aria-hidden="true">−</span>
+                            <span>Zmizí jako rodič z @Impact.SpouseFamilyCount @Czech.Plural(Impact.SpouseFamilyCount, "rodiny", "rodin", "rodin").</span>
+                        </li>
+                    }
+                    @if (Impact.ChildFamilyCount > 0)
+                    {
+                        <li>
+                            <span class="k-impact-mark" aria-hidden="true">−</span>
+                            <span>Zmizí jako dítě z @Impact.ChildFamilyCount @Czech.Plural(Impact.ChildFamilyCount, "rodiny", "rodin", "rodin").</span>
+                        </li>
+                    }
+                    @if (Impact.LosingParentNames.Count > 0)
+                    {
+                        <li>
+                            <span class="k-impact-mark" aria-hidden="true">!</span>
+                            <span>
+                                @Impact.LosingParentNames.Count
+                                @Czech.Plural(Impact.LosingParentNames.Count, "potomek přijde", "potomci přijdou", "potomků přijde")
+                                o tohoto rodiče — a tím i o celou větev jeho předků:
+                                <ul class="k-names">
+                                    @foreach (var n in Impact.LosingParentNames)
+                                    {
+                                        <li>@n</li>
+                                    }
+                                </ul>
+                            </span>
+                        </li>
+                    }
+                    @if (Impact.EmptiedFamilyIds.Count > 0)
+                    {
+                        <li>
+                            <span class="k-impact-mark" aria-hidden="true">!</span>
+                            <span>Bez jediného člena @Czech.Plural(Impact.EmptiedFamilyIds.Count, "zůstane rodina", "zůstanou rodiny", "zůstane rodin") @string.Join(", ", Impact.EmptiedFamilyIds) — smažte ji zvlášť, pokud ji už nechcete.</span>
+                        </li>
+                    }
+                </ul>
+
+                <p>
+                    <strong>Zachovat jako neznámou osobu</strong> nechá v rodokmenu prázdný záznam
+                    <em>@PersonDisplay.UnknownLabel</em>, který všechny tyhle vazby drží dál. Přijdete o jméno,
+                    data i poznámky — <strong>včetně údajů, které editor neumí zobrazit</strong> — ale rodokmen
+                    se nerozpadne na kusy.
+                </p>
+            }
+        </div>
+        <div class="k-modal-foot">
+            @if (Impact.HasAnyLinks)
+            {
+                <button type="button" class="k-btn k-btn--primary" @onclick="OnKeepAsUnknown">Zachovat jako neznámou osobu</button>
+            }
+            @* „úplně" dává smysl jen proti nabídnuté alternativě *@
+            <button type="button" class="k-btn k-btn--danger" @onclick="OnDelete">@(Impact.HasAnyLinks ? "Smazat úplně" : "Smazat")</button>
+            <span class="k-spacer"></span>
+            <button type="button" class="k-btn k-btn--ghost" @onclick="OnCancel">Zrušit</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ElementReference _dialogRef;
+
+    /// <summary>Spočítaný dopad smazání — co přesně se v tomhle dokumentu rozpadne.</summary>
+    [Parameter, EditorRequired]
+    public PersonDeletionImpact Impact { get; set; } = null!;
+
+    /// <summary>Šetrnější varianta: záznam i vazby zůstanou, zmizí jen identita.</summary>
+    [Parameter]
+    public EventCallback OnKeepAsUnknown { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    /// <summary>
+    /// Komponenta žije jen po dobu otevřeného dialogu, takže první render == právě se otevřel.
+    /// Fokus je nutný, aby Esc fungoval hned a čtečka dialog ohlásila.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _dialogRef.FocusAsync();
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await OnCancel.InvokeAsync();
+        }
+    }
+}

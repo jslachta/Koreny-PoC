@@ -1,0 +1,142 @@
+@using Koreny.Models
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+@* Rodokmen přes celou obrazovku. Náhled ve stránce je navigátor; číst se strom chodí sem,
+   proto je tady i tisk a stažení celého SVG (nezávislé na aktuálním pan/zoom).
+
+   Komponenta žije jen po dobu otevřeného overlaye, takže si fokus i Esc řeší sama —
+   stránka o nich nemusí vědět. *@
+
+<div class="k-overlay"
+     tabindex="-1"
+     @ref="_overlayRef"
+     @onkeydown="OnKeyDown">
+    <div class="k-overlay-bar">
+        <span class="k-overlay-title">
+            <svg viewBox="0 0 100 100" width="22" height="22" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect width="100" height="100" rx="16" fill="#2D5A3D" />
+                <rect x="46" y="38" width="8" height="28" rx="2" fill="#E8D5A3" />
+                <line x1="50" y1="42" x2="30" y2="24" stroke="#E8D5A3" stroke-width="6" stroke-linecap="round" />
+                <line x1="50" y1="42" x2="70" y2="24" stroke="#E8D5A3" stroke-width="6" stroke-linecap="round" />
+                <line x1="50" y1="66" x2="30" y2="82" stroke="#E8D5A3" stroke-width="6" stroke-linecap="round" />
+                <line x1="50" y1="66" x2="70" y2="82" stroke="#E8D5A3" stroke-width="6" stroke-linecap="round" />
+            </svg>
+            Rodokmen
+        </span>
+        <button type="button" class="k-btn k-btn--sm" @onclick="PrintAsync">Tisk</button>
+        <button type="button" class="k-btn k-btn--sm k-btn--outline" @onclick="DownloadAsync">Stáhnout rodokmen</button>
+        <button type="button"
+                class="k-btn k-btn--icon k-btn--ghost"
+                @onclick="CloseAsync"
+                title="Zavřít (Esc)"
+                aria-label="Zavřít">×</button>
+    </div>
+    <div class="k-overlay-body">
+        <TopolaTree @ref="_tree"
+                    Document="@Document"
+                    RootPersonId="@RootPersonId"
+                    OnPersonSelected="OnPersonSelected" />
+    </div>
+</div>
+
+@code {
+    private ElementReference _overlayRef;
+    private TopolaTree? _tree;
+    private IJSObjectReference? _exportModule;
+
+    [Parameter, EditorRequired]
+    public GedcomDocument Document { get; set; } = null!;
+
+    [Parameter]
+    public string? RootPersonId { get; set; }
+
+    /// <summary>Klik na osobu ve stromu — stránka si podle toho přepne kořen a overlay zavře.</summary>
+    [Parameter]
+    public EventCallback<string> OnPersonSelected { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <summary>Overlay se mountuje až při otevření, takže první render == právě se otevřel.</summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _overlayRef.FocusAsync();
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+
+    /// <summary>Stáhne celý rodokmen jako samostatné SVG (nezávislé na aktuálním pan/zoom).</summary>
+    private async Task DownloadAsync()
+    {
+        var svg = await ExportSvgAsync();
+        if (svg is null)
+        {
+            return;
+        }
+
+        var module = await GetExportModuleAsync();
+        await module.InvokeVoidAsync("downloadSvg", svg, "koreny-rodokmen.svg");
+    }
+
+    /// <summary>Tisk exportovaného (zoom-resetnutého) SVG — celý strom, ne aktuální výřez.</summary>
+    private async Task PrintAsync()
+    {
+        var svg = await ExportSvgAsync();
+        if (svg is null)
+        {
+            return;
+        }
+
+        var module = await GetExportModuleAsync();
+        await module.InvokeVoidAsync("printSvg", svg);
+    }
+
+    private async Task<string?> ExportSvgAsync()
+    {
+        if (_tree is null)
+        {
+            return null;
+        }
+
+        var svg = await _tree.ExportSvgAsync();
+        return string.IsNullOrEmpty(svg) ? null : svg;
+    }
+
+    /// <summary>Modul je natažený už při startu stránky, takže tenhle import jde do paměti.</summary>
+    private async ValueTask<IJSObjectReference> GetExportModuleAsync()
+    {
+        _exportModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/export.js");
+        return _exportModule;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_exportModule is not null)
+            {
+                await _exportModule.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+            // Okruh je pryč — JS strana zmizela i s modulem.
+        }
+
+        _exportModule = null;
+    }
+}
