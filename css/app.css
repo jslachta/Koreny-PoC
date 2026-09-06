@@ -603,6 +603,62 @@ textarea:focus-visible,
     float: none;
 }
 
+/* Zúžení dlouhé nabídky přímo ve formuláři — drobnější než hledání v hlavičce panelu,
+   protože sedí uvnitř pole a nesmí přebít popisek, ke kterému patří. */
+.k-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.3rem;
+}
+
+.k-filter-icon { font-size: 0.75rem; opacity: 0.55; flex: 0 0 auto; }
+
+.k-filter-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.8rem;
+    padding: 0.25rem 0.45rem;
+    border: 1px solid var(--k-line);
+    border-radius: var(--k-r-sm);
+    background: #FCFBF8;
+    color: var(--k-ink);
+}
+
+.k-filter-input::placeholder { color: #A9B0A9; }
+.k-filter-input:hover { border-color: #BDB5A3; }
+
+.k-filter-input:focus {
+    outline: none;
+    border-color: var(--k-forest);
+    box-shadow: var(--k-ring);
+}
+
+.k-filter-input::-webkit-search-cancel-button { display: none; }
+
+.k-filter-count {
+    font-size: 0.72rem;
+    color: var(--k-muted);
+    font-variant-numeric: tabular-nums;
+    flex: 0 0 auto;
+}
+
+/* Hranice mezi dětmi, které rodina má, a zbytkem nabídky. */
+.k-check-sep {
+    height: 1px;
+    background: var(--k-line);
+    margin: 0.25rem 0.35rem;
+}
+
+/* Kolik dětí je vybráno — jistota, že hledáním nic nezmizelo. */
+.k-check-summary {
+    margin: 0.4rem 0 0;
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--k-muted);
+}
+
 .k-check-list {
     display: grid;
     gap: 1px;
