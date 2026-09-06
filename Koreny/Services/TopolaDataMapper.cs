@@ -19,7 +19,9 @@ namespace Koreny.Services;
 ///   nese jen první rodičovskou vazbu (konzistentně se zbytkem aplikace; viz known limitations);
 /// - <c>fams</c> = všechny rodiny, kde je osoba HUSB/WIFE, v pořadí souboru;
 /// - <c>children</c> = CHIL v pořadí uzlů; odkazy na neexistující osoby se vynechávají;
-/// - <c>sex</c> jen pro SEX M/F; roky narození/úmrtí jako <c>{ date: { year } }</c>, když jsou.
+/// - <c>sex</c> jen pro SEX M/F; roky narození/úmrtí jako <c>{ date: { year } }</c>, když jsou;
+/// - <c>maidenName</c> = rodné PŘÍJMENÍ (ne celé jméno), stejně jak ho plní vlastní GEDCOM
+///   čtečka Topoly — kreslí ho až obalení rendereru v js/topola-view.js.
 /// </summary>
 public static class TopolaDataMapper
 {
@@ -43,6 +45,7 @@ public static class TopolaDataMapper
                 Id = ind.Id,
                 FirstName = NullIfEmpty(ind.Name?.GivenName),
                 LastName = NullIfEmpty(ind.Name?.Surname),
+                MaidenName = NullIfEmpty(ind.MaidenName?.Surname),
                 Sex = ind.Sex is "M" or "F" ? ind.Sex : null,
                 Birth = MakeEvent(ind.Birth),
                 Death = MakeEvent(ind.Death),
@@ -128,6 +131,14 @@ public sealed class TopolaIndi
 
     [JsonPropertyName("lastName")]
     public string? LastName { get; init; }
+
+    /// <summary>
+    /// Rodné příjmení. Topola tenhle pojem sama zná (<c>getMaidenName()</c>) a její vlastní
+    /// GEDCOM čtečka ho plní stejným pravidlem jako my — jen příjmení, ne celé jméno.
+    /// Vykreslit ho zatím musí naše obalení rendereru v js/topola-view.js.
+    /// </summary>
+    [JsonPropertyName("maidenName")]
+    public string? MaidenName { get; init; }
 
     [JsonPropertyName("sex")]
     public string? Sex { get; init; }

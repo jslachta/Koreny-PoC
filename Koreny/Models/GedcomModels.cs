@@ -112,6 +112,14 @@ public class GedcomIndividual
 {
     public string Id { get; set; } = string.Empty;
     public GedcomName? Name { get; set; }
+
+    /// <summary>
+    /// Jméno před sňatkem — v GEDCOM 5.5.1 samostatný záznam NAME s podřízeným „TYPE maiden“.
+    /// Je to plné jméno, ne jen příjmení: „Marie /Svobodová/“ dává v cizím softwaru smysl,
+    /// kdežto holé „/Svobodová/“ vypadá jako poškozený záznam.
+    /// </summary>
+    public GedcomName? MaidenName { get; set; }
+
     public string? Sex { get; set; }
     public GedcomEvent? Birth { get; set; }
     public GedcomEvent? Death { get; set; }

@@ -128,6 +128,11 @@
                             <input id="p-surname" class="k-input" @bind="_personForm.Surname" />
                         </div>
                         <div class="k-field">
+                            <label class="k-label" for="p-maiden">Rodné příjmení</label>
+                            <input id="p-maiden" class="k-input" @bind="_personForm.MaidenSurname" placeholder="např. Svobodová" />
+                            <p class="k-hint-text">Příjmení před sňatkem. Ukládá se jako samostatné jméno s typem <code>maiden</code>, jak to popisuje GEDCOM 5.5.1.</p>
+                        </div>
+                        <div class="k-field">
                             <label class="k-label" for="p-sex">Pohlaví</label>
                             <select id="p-sex" class="k-select" @bind="_personForm.SexCode">
                                 <option value="0">Neznámé</option>
@@ -1372,6 +1377,7 @@
             FormFieldSeparator,
             _personForm.Given,
             _personForm.Surname,
+            _personForm.MaidenSurname,
             _personForm.SexCode.ToString(CultureInfo.InvariantCulture),
             _personForm.BirthDate,
             _personForm.BirthPlace,

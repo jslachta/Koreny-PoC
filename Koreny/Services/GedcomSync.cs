@@ -28,7 +28,7 @@ public static class GedcomSync
             InsertRecordBeforeTrlr(doc, node);
         }
 
-        SetSingleValue(node, "NAME", ind.Name?.Raw?.Trim());
+        SyncNames(node, ind);
         SetSingleValue(node, "SEX", ind.Sex);
         SyncEvent(node, "BIRT", ind.Birth);
         SyncEvent(node, "DEAT", ind.Death);
@@ -102,6 +102,7 @@ public static class GedcomSync
     public static void AnonymizeIndividual(GedcomDocument doc, GedcomIndividual ind)
     {
         ind.Name = null;
+        ind.MaidenName = null;
         ind.Sex = null;
         ind.Birth = null;
         ind.Death = null;
@@ -179,6 +180,58 @@ public static class GedcomSync
         {
             doc.Nodes.Insert(idx, record);
         }
+    }
+
+    /// <summary>
+    /// Zapíše hlavní i rodné jméno. Obojí je NAME, takže se nesmí trefit do toho druhého:
+    /// hlavní jde na poslední NAME bez „TYPE maiden“, rodné na ten s ním. Vymazané rodné
+    /// příjmení celý ten záznam odstraní — prázdný NAME s TYPE by byl jen šum v exportu.
+    /// </summary>
+    private static void SyncNames(GedcomNode node, GedcomIndividual ind)
+    {
+        var primaryValue = ind.Name?.Raw?.Trim();
+        var primary = GedcomNameTypes.LastPrimaryName(node);
+        if (string.IsNullOrEmpty(primaryValue))
+        {
+            if (primary is not null)
+            {
+                node.Children.Remove(primary);
+            }
+        }
+        else if (primary is null)
+        {
+            node.Children.Add(new GedcomNode("NAME", value: primaryValue));
+        }
+        else
+        {
+            primary.Value = primaryValue;
+        }
+
+        var maidenValue = ind.MaidenName?.Raw?.Trim();
+        var maiden = GedcomNameTypes.MaidenNameNode(node);
+        if (string.IsNullOrEmpty(maidenValue))
+        {
+            if (maiden is not null)
+            {
+                node.Children.Remove(maiden);
+            }
+
+            return;
+        }
+
+        if (maiden is null)
+        {
+            maiden = new GedcomNode("NAME", value: maidenValue);
+            maiden.Children.Add(new GedcomNode("TYPE", value: GedcomNameTypes.Maiden));
+
+            // Jména patří k sobě: pořadí sourozenců pod INDI sice standard neurčuje, ale nové
+            // jméno až za FAMC/FAMS by z minimálního diffu udělalo záznam, který se nedá číst.
+            // Bez jediného NAME (index −1) vyjde vložení na začátek záznamu, kam jméno patří.
+            node.Children.Insert(node.Children.FindLastIndex(c => c.Tag == "NAME") + 1, maiden);
+            return;
+        }
+
+        maiden.Value = maidenValue;
     }
 
     /// <summary>Nastaví hodnotu posledního výskytu tagu (vytvoří na konci, když chybí); prázdná hodnota poslední výskyt odstraní.</summary>

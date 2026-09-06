@@ -107,6 +107,10 @@ public class GedcomParser
         {
             switch (c.Tag)
             {
+                // Rodné jméno se nesmí stát hlavním jménem, i když v souboru stojí až za ním.
+                case "NAME" when GedcomNameTypes.IsMaiden(c):
+                    indi.MaidenName ??= GedcomNameParser.Parse(c.Value); // vyhrává první, stejně jako u zápisu
+                    break;
                 case "NAME":
                     indi.Name = GedcomNameParser.Parse(c.Value); // poslední výskyt vyhrává
                     break;

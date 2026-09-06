@@ -25,7 +25,7 @@ else
             var top = n.CenterY - NodeHeight * 0.5;
             var isRoot = n.Id == RootPersonId;
             <g style="cursor: pointer;" @onclick="@(() => OnNodeClickAsync(n.Id))" @ondblclick="@(() => OnNodeDoubleClickAsync(n.Id))" @onclick:stopPropagation="true">
-                <title>@n.FullName — @n.Lifespan</title>
+                <title>@NodeTitle(n)</title>
                 <rect x="@F(left)" y="@F(top)" width="@F(NodeWidth)" height="@F(NodeHeight)" rx="8" ry="8"
                       fill="@(isRoot ? RootFill : NodeFill)" stroke="@(isRoot ? RootStroke : NodeStroke)" stroke-width="@(isRoot ? "2" : "1")" />
                 <text x="@F(n.CenterX)" y="@F(n.CenterY - TextLineOffsetY)" text-anchor="middle" font-size="@F(NameFontSize)" font-weight="@(isRoot ? "650" : "500")" fill="@InkColor">@Truncate(n.FullName)</text>
@@ -294,7 +294,7 @@ else
             var top = n.CenterY - NodeHeight * 0.5;
             var isRoot = n.Id == RootPersonId;
             sb.Append("<g>");
-            sb.Append("<title>").Append(XmlEscape($"{n.FullName} — {n.Lifespan}")).Append("</title>");
+            sb.Append("<title>").Append(XmlEscape(NodeTitle(n))).Append("</title>");
             sb.Append("<rect x=\"").Append(F(left)).Append("\" y=\"").Append(F(top)).Append("\" width=\"").Append(F(NodeWidth)).Append("\" height=\"").Append(F(NodeHeight))
               .Append("\" rx=\"8\" ry=\"8\" fill=\"").Append(isRoot ? RootFill : NodeFill)
               .Append("\" stroke=\"").Append(isRoot ? RootStroke : NodeStroke)
@@ -531,8 +531,20 @@ else
             CenterX = centerX,
             CenterY = centerY,
             FullName = PersonDisplay.Name(i),
+            MaidenSurname = i.MaidenName?.Surname ?? string.Empty,
             Lifespan = FormatLifespan(i),
         };
+
+    /// <summary>
+    /// Text tooltipu. Rodné příjmení se do rámečku nevejde — jméno se v něm ořezává na
+    /// <see cref="MaxNameChars"/> znaků a třetí řádek by zvedl výšku všem boxům kvůli menšině
+    /// osob. Náhled je navigátor; číst se rodokmen chodí do overlaye, kde ho kreslí Topola.
+    /// </summary>
+    private static string NodeTitle(LayoutNode n)
+    {
+        var name = n.MaidenSurname.Length > 0 ? $"{n.FullName} roz. {n.MaidenSurname}" : n.FullName;
+        return n.Lifespan.Length > 0 ? $"{name} — {n.Lifespan}" : name;
+    }
 
     private static string FormatLifespan(GedcomIndividual i)
     {
@@ -619,6 +631,10 @@ else
         public double CenterX { get; set; }
         public double CenterY { get; set; }
         public required string FullName { get; set; }
+
+        /// <summary>Jen pro tooltip — do rámečku se nekreslí (viz <see cref="NodeTitle"/>).</summary>
+        public required string MaidenSurname { get; set; }
+
         public required string Lifespan { get; set; }
     }
 

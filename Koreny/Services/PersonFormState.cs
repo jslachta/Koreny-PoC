@@ -17,6 +17,10 @@ public sealed class PersonFormState
     // Editovatelná pole (bindovaná v UI).
     public string Given { get; set; } = string.Empty;
     public string Surname { get; set; } = string.Empty;
+
+    /// <summary>Příjmení před sňatkem („roz. Svobodová“). Prázdné = osoba rodné jméno v souboru nemá.</summary>
+    public string MaidenSurname { get; set; } = string.Empty;
+
     public int SexCode { get; set; } // 0 = neznámé, 1 = M, 2 = F
     public string BirthDate { get; set; } = string.Empty;
     public string BirthPlace { get; set; } = string.Empty;
@@ -29,6 +33,9 @@ public sealed class PersonFormState
     private string _nameRaw = string.Empty;
     private string _origGiven = string.Empty;
     private string _origSurname = string.Empty;
+    private bool _hadMaidenName;
+    private string _maidenRaw = string.Empty;
+    private string _origMaidenSurname = string.Empty;
     private string? _origSex;
     private int _origSexCode;
     private bool _birthPresent;
@@ -43,6 +50,11 @@ public sealed class PersonFormState
         Surname = ind.Name?.Surname ?? string.Empty;
         _origGiven = Given;
         _origSurname = Surname;
+
+        _hadMaidenName = ind.MaidenName is not null;
+        _maidenRaw = ind.MaidenName?.Raw ?? string.Empty;
+        MaidenSurname = ind.MaidenName?.Surname ?? string.Empty;
+        _origMaidenSurname = MaidenSurname;
 
         _origSex = ind.Sex;
         SexCode = ind.Sex switch { "M" => 1, "F" => 2, _ => 0 };
@@ -68,6 +80,7 @@ public sealed class PersonFormState
     public void ApplyTo(GedcomIndividual ind)
     {
         ApplyName(ind);
+        ApplyMaidenName(ind);
         ApplySex(ind);
         ind.Birth = GedcomFormValues.BuildEvent(_birthPresent, BirthDate, BirthPlace);
         ind.Death = GedcomFormValues.BuildEvent(_deathPresent, DeathDate, DeathPlace);
@@ -103,6 +116,44 @@ public sealed class PersonFormState
             GivenName = GedcomFormValues.NullIfEmpty(g),
             Surname = GedcomFormValues.NullIfEmpty(s),
             Raw = s.Length > 0 ? $"{g} /{s}/".Trim() : g,
+        };
+    }
+
+    /// <summary>
+    /// Rodné jméno se skládá z křestního jména osoby a rodného příjmení — v GEDCOM je to plný
+    /// NAME, ne příjmení samo o sobě. Dokud uživatel do políčka nesáhne, drží se původní surový
+    /// řetězec: soubor může mít „Marie /Svobodová/“ i holé „/Svobodová/“ a uložení beze změny
+    /// nesmí ani jedno přepsat (docs/principy.md, principy 3 a 4).
+    /// </summary>
+    private void ApplyMaidenName(GedcomIndividual ind)
+    {
+        var maiden = MaidenSurname.Trim();
+
+        if (_hadMaidenName && maiden == _origMaidenSurname.Trim())
+        {
+            ind.MaidenName = maiden.Length == 0 && _maidenRaw.Trim().Length == 0
+                ? null
+                : new GedcomName
+                {
+                    Raw = _maidenRaw,
+                    GivenName = GedcomNameParser.Parse(_maidenRaw).GivenName,
+                    Surname = GedcomFormValues.NullIfEmpty(maiden),
+                };
+            return;
+        }
+
+        if (maiden.Length == 0)
+        {
+            ind.MaidenName = null;
+            return;
+        }
+
+        var given = Given.Trim();
+        ind.MaidenName = new GedcomName
+        {
+            GivenName = GedcomFormValues.NullIfEmpty(given),
+            Surname = maiden,
+            Raw = $"{given} /{maiden}/".Trim(),
         };
     }
 

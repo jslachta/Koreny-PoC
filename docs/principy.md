@@ -130,4 +130,7 @@ Poctivý seznam míst, kde aplikace vlastní principy zatím neplní:
    extrémní hloubku vnoření, obří počet záznamů a patologické `CONC`/`CONT` řetězení.
 2. **Editor umí zlomek toho, co parser uchová** (princip 3 v duchu, ne liteře). Data se
    neztrácejí, ale spoustu z nich nelze v aplikaci upravit — uživatel to nevnímá jako
-   záměr, ale jako „nejde to".
+   záměr, ale jako „nejde to". Konkrétní případ: z pěti typů jména (`NAME.TYPE`) editor
+   rozumí jedinému, `maiden`. Jméno s typem `aka`, `married`, `birth` či `immigrant`
+   v souboru přežije, ale nejde ho zobrazit ani upravit — a protože „poslední NAME
+   vyhrává", může se takové jméno stát tím, které aplikace ukazuje.

@@ -120,4 +120,22 @@ public class TopolaDataMapperTests
         Assert.Contains("\"firstName\":\"Tomáš\"", json);
         Assert.Contains("\"sex\":\"M\"", json);
     }
+
+    /// <summary>
+    /// Rodné jméno jde do <c>maidenName</c>, tedy pod klíč, který Topola sama zná — a jen
+    /// jako PŘÍJMENÍ, ne celé jméno. Osoba bez rodného jména klíč vůbec nemá.
+    /// </summary>
+    [Fact]
+    public void MaidenName_IsMappedAsSurnameOnly()
+    {
+        var doc = _parser.Parse(ReadCorpus("corpus-09-rodne-prijmeni.ged"));
+        var data = TopolaDataMapper.Map(doc);
+
+        Assert.Equal("Svobodová", Indi(data, "I1").MaidenName);
+        Assert.Equal("Nováková", Indi(data, "I1").LastName); // hlavní jméno zůstává hlavní
+        Assert.Null(Indi(data, "I3").MaidenName);
+
+        var json = TopolaDataMapper.ToJson(doc);
+        Assert.Contains("\"maidenName\":\"Svobodová\"", json);
+    }
 }
