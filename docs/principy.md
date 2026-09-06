@@ -96,6 +96,11 @@ nebo jen načtené ze souboru (lze načíst znovu). Smazání osoby ukáže v di
 potomky odřízne od jejich větve předků** a které rodiny zůstanou bez členů. Smazání rodiny se
 ptá stejně, jen jednou větou. Zrušení dialogu nemění nic.
 
+*Ztráta práce není jen mazání záznamu.* Panely Osoby a Rodiny stojí vedle sebe, ale rozepsaný
+formulář je vědomě jen jeden: otevřít druhý znamená zavřít ten první. Aby to nebyl tichý úklid,
+porovnává se otisk formuláře proti stavu při otevření — nedotčený se zavře bez ptaní,
+rozepsaný se zeptá a řekne, co se ztratí („Rozepsaná nová osoba se neuloží a zmizí.").
+
 *Když je dopad velký, nabídne se šetrnější cesta.* Mazání zásadně nekaskáduje, takže osoba
 uprostřed rodokmenu za sebou nechá díru: potomci nepřijdou jen o rodiče, ale o celou jeho
 větev předků. Proto je vedle mazání volba **„zachovat jako neznámou osobu"**
@@ -111,7 +116,9 @@ aplikace vstupují cizí data. Podle toho se k němu chováme.
 
 *V kódu:* parser nepadá na neznámých či poškozených konstrukcích, čtení má limit velikosti,
 výpočty nad grafem (předci) si drží množinu navštívených uzlů, takže cyklus v datech je
-nezacyklí. Text z dokumentu se do HTML vkládá escapovaný.
+nezacyklí. Text z dokumentu se do HTML vkládá escapovaný — nikde se neskládá HTML řetězec
+ručně, takže v aplikaci není jediný `MarkupString` a otázka „escapoval jsem to?" nemá kde
+vzniknout.
 
 ---
 
@@ -121,9 +128,6 @@ Poctivý seznam míst, kde aplikace vlastní principy zatím neplní:
 
 1. **Parser nebyl systematicky trápen zlomyslným vstupem** (princip 8). Chybí testy pro
    extrémní hloubku vnoření, obří počet záznamů a patologické `CONC`/`CONT` řetězení.
-2. **`MarkupString` ve stavovém řádku** (princip 8). Dnes se jméno escapuje ručně a je to
-   pokryté, ale je to typ místa, kde díra vznikne příští nevinnou editací. Kandidát na
-   nahrazení běžným řetězcem s `<strong>` mimo interpolaci.
-3. **Editor umí zlomek toho, co parser uchová** (princip 3 v duchu, ne liteře). Data se
+2. **Editor umí zlomek toho, co parser uchová** (princip 3 v duchu, ne liteře). Data se
    neztrácejí, ale spoustu z nich nelze v aplikaci upravit — uživatel to nevnímá jako
    záměr, ale jako „nejde to".
