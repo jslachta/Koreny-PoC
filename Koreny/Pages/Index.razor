@@ -659,6 +659,9 @@
     private IJSObjectReference? _unsavedGuardModule;
     private bool _unsavedGuardArmed;
 
+    /// <summary>Strážce se nenačetl — přestaň to zkoušet, ale nezabíjej kvůli tomu editor.</summary>
+    private bool _unsavedGuardUnavailable;
+
     private enum PanelView
     {
         None,
@@ -675,6 +678,11 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            await PreloadJsModulesAsync();
+        }
+
         if (_pendingTopolaOverlayFocus && _showTopolaOverlay)
         {
             _pendingTopolaOverlayFocus = false;
@@ -691,12 +699,62 @@
     }
 
     /// <summary>
+    /// Všechny vlastní JS moduly aplikace. Seznam je tady, protože jediné místo, kde se
+    /// zaručeně načtou všechny, je start — komponenty si je pak berou samy podle potřeby.
+    /// </summary>
+    private static readonly string[] JsModules =
+    {
+        "./js/unsaved-guard.js",
+        "./js/export.js",
+        "./js/topola-view.js", // s ním se staticky natáhne i svg-export.js
+    };
+
+    /// <summary>Držené reference na předem načtené moduly — jen aby je nic neuklidilo dřív než stránku.</summary>
+    private readonly List<IJSObjectReference> _preloadedModules = new();
+
+    /// <summary>
+    /// Kořeny mají po načtení běžet bez sítě: jakmile je aplikace v prohlížeči, výpadek spojení
+    /// nesmí být ničí problém. Dynamický <c>import()</c> je ale síťový požadavek — a dokud se
+    /// moduly dotahovaly „až bude potřeba“, záviselo první uložení nebo první zobrazení
+    /// rodokmenu na tom, že server po hodinách editace pořád stojí.
+    ///
+    /// Instanci ES modulu drží dokument podle URL, takže stačí každý modul jednou vyžádat tady:
+    /// pozdější <c>import()</c> v komponentách sáhne do paměti a na síť už nejde.
+    /// </summary>
+    private async Task PreloadJsModulesAsync()
+    {
+        foreach (var path in JsModules)
+        {
+            try
+            {
+                var module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", path);
+                _preloadedModules.Add(module);
+
+                // Rovnou i do polí, která moduly používají — pozdější volání pak nečeká na nic.
+                switch (path)
+                {
+                    case "./js/unsaved-guard.js":
+                        _unsavedGuardModule = module;
+                        break;
+                    case "./js/export.js":
+                        _exportModule = module;
+                        break;
+                }
+            }
+            catch
+            {
+                // Nenačtený modul si ošetří ta funkce, které patří; start editoru to nesmí zastavit.
+            }
+        }
+    }
+
+    /// <summary>
     /// Drží beforeunload strážce v souladu s _dirty. Synchronizuje se po renderu, aby
     /// jednotlivá místa nastavující _dirty nemusela být async — stav je jen jeden a přepíná se tu.
     /// </summary>
     private async Task SyncUnsavedGuardAsync()
     {
-        if (_dirty == _unsavedGuardArmed)
+        if (_unsavedGuardUnavailable || _dirty == _unsavedGuardArmed)
         {
             return;
         }
@@ -710,6 +768,15 @@
         catch (JSDisconnectedException)
         {
             // Okruh je pryč (reload/zavření) — strážce už nemá co hlídat.
+        }
+        catch
+        {
+            // Strážce se nenačetl (výpadek modulu, zastaralá cache po přebuildu…). Běží
+            // v OnAfterRender, takže neodchycená výjimka by položila celý editor — a to je
+            // za ztrátu jednoho varování příliš. Rozpracovaná transakce zůstává vidět tam,
+            // kde na ní záleží nejvíc: tečka v titulku a štítek „Neuloženo“ (princip 4).
+            // Zkoušet to při každém renderu znovu nemá smysl, modul se sám neobjeví.
+            _unsavedGuardUnavailable = true;
         }
     }
 
@@ -1587,6 +1654,11 @@
             {
                 await _exportModule.DisposeAsync();
             }
+
+            foreach (var module in _preloadedModules)
+            {
+                await module.DisposeAsync();
+            }
         }
         catch (JSDisconnectedException)
         {
@@ -1596,5 +1668,6 @@
         _unsavedGuardModule = null;
         _unsavedGuardArmed = false;
         _exportModule = null;
+        _preloadedModules.Clear();
     }
 }
