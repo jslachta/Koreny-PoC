@@ -245,7 +245,7 @@
                                             @onclick="@(() => SelectPerson(rowId))"
                                             aria-pressed="@(selected ? "true" : "false")">
                                         <span class="k-row-name">@PersonDisplay.Name(p)</span>
-                                        <span class="k-row-years">@FormatLifespanYears(p)</span>
+                                        <span class="k-row-years">@PersonDisplay.LifespanYears(p)</span>
                                     </button>
                                     @if (selected)
                                     {
@@ -289,7 +289,7 @@
                                     <option value="">(žádný)</option>
                                     @foreach (var p in _doc.Individuals)
                                     {
-                                        <option value="@p.Id">@PersonDisplay.Name(p) (@p.Id)</option>
+                                        <option value="@p.Id">@PersonDisplay.Name(p) · @PersonDisplay.LifespanYears(p) (@p.Id)</option>
                                     }
                                 </select>
                             </div>
@@ -299,7 +299,7 @@
                                     <option value="">(žádná)</option>
                                     @foreach (var p in _doc.Individuals)
                                     {
-                                        <option value="@p.Id">@PersonDisplay.Name(p) (@p.Id)</option>
+                                        <option value="@p.Id">@PersonDisplay.Name(p) · @PersonDisplay.LifespanYears(p) (@p.Id)</option>
                                     }
                                 </select>
                             </div>
@@ -331,7 +331,9 @@
                                                 var cid = c.Id;
                                                 <label class="k-check">
                                                     <input type="checkbox" checked="@IsFamilyChildChecked(cid)" @onchange="@(e => OnFamilyChildToggle(cid, e))" />
-                                                    <span>@PersonDisplay.Name(c)</span>
+                                                    <span class="k-check-name">@PersonDisplay.Name(c)</span>
+                                                    @* Jmenovci jsou v rodokmenu pravidlo, ne výjimka — bez let se nedají rozlišit. *@
+                                                    <span class="k-check-years">@PersonDisplay.LifespanYears(c)</span>
                                                     <span class="k-check-id">@cid</span>
                                                 </label>
                                             }
@@ -951,28 +953,6 @@
         return _doc.Families
             .OrderBy(f => f.HusbandId is null && f.WifeId is null)
             .ThenBy(f => FamilyDisplay.Partners(_doc, f), StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static string FormatLifespanYears(GedcomIndividual i)
-    {
-        var b = i.Birth?.ParsedYear;
-        var d = i.Death?.ParsedYear;
-        if (b is not null && d is not null)
-        {
-            return $"{b}–{d}";
-        }
-
-        if (b is not null)
-        {
-            return $"{b}–";
-        }
-
-        if (d is not null)
-        {
-            return $"–{d}";
-        }
-
-        return "?";
     }
 
     /// <summary>Nastaveno, když osoba vzniká z prázdného stavu „nová rodina" — po uložení se vrátíme k rodině.</summary>
