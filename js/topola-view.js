@@ -22,6 +22,40 @@ import { exportSvgString } from "./svg-export.js";
 const SVG_NS = "http://www.w3.org/2000/svg";
 const EXPORT_PADDING = 20;
 
+/**
+ * Topola rodné jméno zná (`getMaidenName()` i vlastní čtečka `NAME`/`TYPE maiden`), ale žádný
+ * z jejích rendererů ho nekreslí. Obalíme proto `getIndiDetails`: zavoláme původní implementaci
+ * a před její řádky (* narození, + úmrtí) vložíme „roz. …". Není to kopie knihovní logiky, takže
+ * upgrade Topoly nemá co rozbít — a kdyby začala rodné jméno kreslit sama, stačí tohle smazat.
+ *
+ * Bundle zůstává nedotčený (princip 2: jeho sha256 v lib/topola/README.md platí dál).
+ */
+let maidenNamePatched = false;
+
+function patchMaidenNameRendering() {
+  if (maidenNamePatched || typeof topola === "undefined" || !topola.DetailedRenderer) {
+    return;
+  }
+
+  const base = topola.DetailedRenderer.prototype.getIndiDetails;
+  if (typeof base !== "function") {
+    return; // jiná verze Topoly — radši nekreslit nic než spadnout
+  }
+
+  topola.DetailedRenderer.prototype.getIndiDetails = function (indi) {
+    const details = base.call(this, indi);
+    const maiden = typeof indi.getMaidenName === "function" ? indi.getMaidenName() : null;
+    if (maiden) {
+      // Bez symbolu: hvězdička a křížek mají v rodokmenu ustálený význam, „roz." se mezi ně neplete.
+      details.unshift({ symbol: "", text: `roz. ${maiden}` });
+    }
+
+    return details;
+  };
+
+  maidenNamePatched = true;
+}
+
 /** @type {Map<string, { svg: SVGSVGElement, container: HTMLElement }>} */
 const instances = new Map();
 
@@ -43,6 +77,8 @@ export function init(elementId, dataJson, rootId, dotNetRef) {
   if (!data || !Array.isArray(data.indis) || data.indis.length === 0) {
     return; // prázdný dokument — není co kreslit
   }
+
+  patchMaidenNameRendering(); // až tady: dřív nemusí být bundle `topola` na window
 
   const svgId = `${elementId}-svg`;
   container.innerHTML = `<svg id="${svgId}"></svg>`;

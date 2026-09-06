@@ -545,6 +545,22 @@ textarea:focus-visible,
     letter-spacing: 0.01em;
 }
 
+/* Vysvětlivka pod polem — tam, kde samotný popisek neřekne, co se do souboru zapíše. */
+.k-hint-text {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--k-muted);
+}
+
+.k-hint-text code {
+    font-size: 0.72rem;
+    padding: 0 0.2rem;
+    border-radius: 3px;
+    background: var(--k-gold-tint);
+    color: var(--k-ink-soft);
+}
+
 .k-input, .k-select {
     font: inherit;
     font-size: 0.9rem;
