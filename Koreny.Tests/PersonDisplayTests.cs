@@ -61,6 +61,42 @@ public class PersonDisplayTests
     }
 
     [Fact]
+    public void Details_ListAllKnownFieldsInFormOrder()
+    {
+        var person = new GedcomIndividual
+        {
+            Id = "I5",
+            Name = new GedcomName { GivenName = "Marie", Surname = "Nováková", Raw = "Marie /Nováková/" },
+            MaidenName = new GedcomName { GivenName = "Marie", Surname = "Svobodová", Raw = "Marie /Svobodová/" },
+            Sex = "F",
+            Birth = new GedcomEvent { Date = "ABT 1850", Place = "Praha" },
+            Death = new GedcomEvent { Place = "Brno" },
+        };
+        person.Notes.Add("Učitelka");
+
+        Assert.Equal(
+            new (string, string)[]
+            {
+                ("Rodné příjmení", "Svobodová"),
+                ("Pohlaví", "žena"),
+                ("Narození", "ABT 1850, Praha"),
+                ("Úmrtí", "Brno"),
+                ("Poznámka", "Učitelka"),
+                ("ID", "I5"),
+            },
+            PersonDisplay.Details(person));
+    }
+
+    /// <summary>Chybějící údaj se vynechá; holé „BIRT Y" nic neukazuje a nestandardní pohlaví zůstane, jak je.</summary>
+    [Fact]
+    public void Details_SkipMissingFields()
+    {
+        var person = new GedcomIndividual { Id = "I6", Sex = "U", Birth = new GedcomEvent() };
+
+        Assert.Equal(new (string, string)[] { ("Pohlaví", "U"), ("ID", "I6") }, PersonDisplay.Details(person));
+    }
+
+    [Fact]
     public void UnnamedPerson_KeepsItsLabel()
     {
         Assert.Equal(PersonDisplay.UnknownLabel, PersonDisplay.Name(new GedcomIndividual { Id = "I4" }));

@@ -30,7 +30,8 @@
 }
 
 @* Jméno z dokumentu jde do stránky jako text, ne jako HTML (princip 8). *@
-<p class="k-status" role="status">
+@* div, ne p — údaje osoby jsou seznam <dl>, který v odstavci být nesmí. *@
+<div class="k-status" role="status">
     @if (!HasPeople)
     {
         <text>Zatím žádné osoby.</text>
@@ -40,12 +41,20 @@
         <text>Vybraná osoba: </text>
 
         <strong>@PersonDisplay.Name(selectedPerson)</strong>
+
+        <dl class="k-status-details">
+            @foreach (var (label, value) in PersonDisplay.Details(selectedPerson))
+            {
+                <dt>@label</dt>
+                <dd title="@value">@value</dd>
+            }
+        </dl>
     }
     else
     {
         <text>Vyberte osobu v seznamu.</text>
     }
-</p>
+</div>
 
 <div class="k-panel-body k-panel-body--flush">
     @if (!HasPeople)
