@@ -89,7 +89,7 @@
                             @onclick="@(() => OnSelect.InvokeAsync(rowId))"
                             aria-pressed="@(selected ? "true" : "false")">
                         <span class="k-row-name">@PersonDisplay.Name(p)</span>
-                        <span class="k-row-years">@PersonDisplay.LifespanYears(p)</span>
+                        <span class="k-row-years">@PersonDisplay.Lifespan(p)</span>
                     </button>
                     @if (selected)
                     {

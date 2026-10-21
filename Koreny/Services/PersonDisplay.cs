@@ -13,32 +13,41 @@ public static class PersonDisplay
     public static string Name(GedcomIndividual? person) =>
         string.IsNullOrWhiteSpace(person?.FullName) ? UnknownLabel : person!.FullName;
 
+    /// <summary>Datum narození česky („3. 3. 1901"), nebo <c>null</c>, když v souboru není.</summary>
+    public static string? BirthDate(GedcomIndividual? person) => GedcomDate.Format(person?.Birth?.Date);
+
+    /// <summary>Datum úmrtí česky, nebo <c>null</c>, když v souboru není.</summary>
+    public static string? DeathDate(GedcomIndividual? person) => GedcomDate.Format(person?.Death?.Date);
+
     /// <summary>
-    /// Životní data jako „1901–1980", u žijící osoby „1978–". Slouží k rozlišení jmenovců,
-    /// takže se ukazuje i tam, kde není co ukázat: „?" říká „tenhle údaj v souboru není",
+    /// Životní data jako „3. 3. 1901 – 1. 3. 1980", u žijící osoby „12. 8. 1978 –".
+    /// Celé datum, ne jen rok: dva jmenovci narození v témže roce se rokem rozlišit nedají
+    /// a datum narození je zároveň ten údaj, kvůli kterému se v rodokmenu listuje.
+    ///
+    /// Ukazuje se i tam, kde není co ukázat: „?" říká „tenhle údaj v souboru není",
     /// kdežto prázdno by vypadalo jako chyba zobrazení.
     ///
-    /// Rok se bere z <see cref="GedcomEvent.ParsedYear"/>, tedy jako první čtyřčíslí v datu —
-    /// zobrazení nikdy nepřepisuje surové datum, které se ukládá zpátky (princip 3).
+    /// Datum rozepisuje <see cref="GedcomDate"/>; surové datum, které se ukládá zpátky,
+    /// zůstává nedotčené (princip 3).
     /// </summary>
-    public static string LifespanYears(GedcomIndividual? person)
+    public static string Lifespan(GedcomIndividual? person)
     {
-        var birth = person?.Birth?.ParsedYear;
-        var death = person?.Death?.ParsedYear;
+        var birth = BirthDate(person);
+        var death = DeathDate(person);
 
         if (birth is not null && death is not null)
         {
-            return $"{birth}–{death}";
+            return $"{birth} – {death}";
         }
 
         if (birth is not null)
         {
-            return $"{birth}–";
+            return $"{birth} –";
         }
 
         if (death is not null)
         {
-            return $"–{death}";
+            return $"– {death}";
         }
 
         return "?";
@@ -46,7 +55,7 @@ public static class PersonDisplay
 
     /// <summary>
     /// Údaje osoby pro proužek s vybranou osobou jako dvojice popisek–hodnota, v pořadí formuláře.
-    /// Na rozdíl od <see cref="LifespanYears"/> se chybějící údaj vynechá: tady nejde o rozlišení
+    /// Na rozdíl od <see cref="Lifespan"/> se chybějící údaj vynechá: tady nejde o rozlišení
     /// jmenovců, ale o přehled, a řádek „Úmrtí: ?" by u žijících zabíral místo bez informace.
     /// Datum se ukazuje surové, tak jak je v souboru (princip 3).
     /// </summary>

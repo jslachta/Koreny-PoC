@@ -51,7 +51,7 @@ else
                     <option value="">(žádný)</option>
                     @foreach (var p in husbands)
                     {
-                        <option value="@p.Id">@PersonDisplay.Name(p) · @PersonDisplay.LifespanYears(p) (@p.Id)</option>
+                        <option value="@p.Id">@PersonDisplay.Name(p) · @PersonDisplay.Lifespan(p) (@p.Id)</option>
                     }
                 </select>
             </div>
@@ -73,7 +73,7 @@ else
                     <option value="">(žádná)</option>
                     @foreach (var p in wives)
                     {
-                        <option value="@p.Id">@PersonDisplay.Name(p) · @PersonDisplay.LifespanYears(p) (@p.Id)</option>
+                        <option value="@p.Id">@PersonDisplay.Name(p) · @PersonDisplay.Lifespan(p) (@p.Id)</option>
                     }
                 </select>
             </div>
@@ -127,9 +127,12 @@ else
                                     var cid = c.Id;
                                     <label class="k-check">
                                         <input type="checkbox" checked="@IsChildChecked(cid)" @onchange="@(e => ToggleChild(cid, e))" />
-                                        <span class="k-check-name">@PersonDisplay.Name(c)</span>
-                                        @* Jmenovci jsou v rodokmenu pravidlo, ne výjimka — bez let se nedají rozlišit. *@
-                                        <span class="k-check-years">@PersonDisplay.LifespanYears(c)</span>
+                                        @* Jmenovci jsou v rodokmenu pravidlo, ne výjimka — bez dat se nedají rozlišit.
+                                           Celé datum se vedle jména na řádek nevejde, proto je pod ním. *@
+                                        <span class="k-check-text">
+                                            <span class="k-check-name">@PersonDisplay.Name(c)</span>
+                                            <span class="k-check-years">@PersonDisplay.Lifespan(c)</span>
+                                        </span>
                                         <span class="k-check-id">@cid</span>
                                     </label>
 

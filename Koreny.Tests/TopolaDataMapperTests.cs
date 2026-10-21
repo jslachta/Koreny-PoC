@@ -138,4 +138,53 @@ public class TopolaDataMapperTests
         var json = TopolaDataMapper.ToJson(doc);
         Assert.Contains("\"maidenName\":\"Svobodová\"", json);
     }
+
+    /// <summary>
+    /// Datum jde do Topoly rozložené na části, ne jako rok — z roku by v overlayi vzniklo
+    /// „1901" tam, kde v souboru stojí „3 MAR 1901". Vypsat si je Topola umí sama (locale „cs").
+    /// </summary>
+    [Fact]
+    public void FullDate_IsMappedIntoParts()
+    {
+        var doc = new GedcomDocument();
+        doc.Individuals.Add(new GedcomIndividual
+        {
+            Id = "I1",
+            Birth = new GedcomEvent { Date = "ABT 3 MAR 1901" },
+            Death = new GedcomEvent { Date = "BET 1980 AND 1985" },
+        });
+
+        var indi = Indi(TopolaDataMapper.Map(doc), "I1");
+
+        var birth = indi.Birth?.Date;
+        Assert.NotNull(birth);
+        Assert.Equal((3, 3, 1901, "abt"), (birth!.Day, birth.Month, birth.Year, birth.Qualifier));
+
+        // Rozmezí má místo data dvě hranice; Topola z nich nakreslí „1980 .. 1985".
+        Assert.Null(indi.Death?.Date);
+        Assert.Equal(1980, indi.Death?.DateRange?.From?.Year);
+        Assert.Equal(1985, indi.Death?.DateRange?.To?.Year);
+    }
+
+    /// <summary>Datum, které se přečíst nedá, projde jako text — Topola ho vypíše, jak je.</summary>
+    [Fact]
+    public void UnreadableDate_IsMappedAsText()
+    {
+        var doc = new GedcomDocument();
+        doc.Individuals.Add(new GedcomIndividual { Id = "I1", Birth = new GedcomEvent { Date = "kolem sv. Václava" } });
+
+        var json = TopolaDataMapper.ToJson(doc);
+
+        Assert.Contains("\"birth\":{\"date\":{\"text\":\"kolem sv. Václava\"}}", json);
+    }
+
+    /// <summary>Událost bez data (holé „BIRT Y") klíč nedostane — prázdná by jen přidala řádek.</summary>
+    [Fact]
+    public void EventWithoutDate_IsNotMapped()
+    {
+        var doc = new GedcomDocument();
+        doc.Individuals.Add(new GedcomIndividual { Id = "I1", Birth = new GedcomEvent { Place = "Praha" } });
+
+        Assert.Null(Indi(TopolaDataMapper.Map(doc), "I1").Birth);
+    }
 }

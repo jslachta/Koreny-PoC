@@ -28,8 +28,17 @@ else
                 <title>@NodeTitle(n)</title>
                 <rect x="@F(left)" y="@F(top)" width="@F(NodeWidth)" height="@F(NodeHeight)" rx="8" ry="8"
                       fill="@(isRoot ? RootFill : NodeFill)" stroke="@(isRoot ? RootStroke : NodeStroke)" stroke-width="@(isRoot ? "2" : "1")" />
-                <text x="@F(n.CenterX)" y="@F(n.CenterY - TextLineOffsetY)" text-anchor="middle" font-size="@F(NameFontSize)" font-weight="@(isRoot ? "650" : "500")" fill="@InkColor">@Truncate(n.FullName)</text>
-                <text x="@F(n.CenterX)" y="@F(n.CenterY + LifespanLineOffsetY)" text-anchor="middle" font-size="@F(LifespanFontSize)" fill="@MutedColor">@n.Lifespan</text>
+                @* Obalující <g> je kvůli Razoru: holé <text> na začátku bloku kódu si bere
+                   pro svou vlastní syntaxi a atributy na něm neuznává. V SVG nic nemění. *@
+                @foreach (var line in NodeLines(n))
+                {
+                    <g>
+                        <text x="@F(n.CenterX)" y="@F(n.CenterY + line.BaselineY)" text-anchor="middle"
+                              font-size="@F(line.FontSize)"
+                              font-weight="@(line.IsName ? (isRoot ? "650" : "500") : "400")"
+                              fill="@(line.IsName ? InkColor : MutedColor)">@line.Text</text>
+                    </g>
+                }
             </g>
         }
     </svg>
@@ -37,7 +46,9 @@ else
 
 @code {
     private const double NodeWidth = 140;
-    private const double NodeHeight = 48;
+
+    /// <summary>Tři řádky (jméno, * narození, † úmrtí) se do původních 48 nevešly.</summary>
+    private const double NodeHeight = 56;
     /// <summary>Vertical gap between stacked rows (centre-to-centre minus node height is handled by row stepping).</summary>
     private const double VerticalGap = 40;
     private const double HorizontalGapGrandparentPair = 10;
@@ -47,9 +58,14 @@ else
     private const double SvgPadding = 20;
     private const double NameFontSize = 12;
     private const double LifespanFontSize = 11;
-    private const double TextLineOffsetY = 6;
-    private const double LifespanLineOffsetY = 14;
+    private const double LineHeight = 14;
+
+    /// <summary>Vzdálenost účaří prvního řádku od horní hrany bloku textu (přibližná výška verzálky).</summary>
+    private const double FirstBaselineY = 10;
     private const int MaxNameChars = 22;
+
+    /// <summary>Datum je kratší než jméno, ale „okolo 1850 .. 1860" se do rámečku taky nevejde.</summary>
+    private const int MaxDateChars = 19;
 
     /// <summary>Barvy odpovídají design systému v css/app.css (SVG neumí CSS proměnné z hostitele při exportu).</summary>
     private const string NodeFill = "#FFFFFF";
@@ -299,8 +315,15 @@ else
               .Append("\" rx=\"8\" ry=\"8\" fill=\"").Append(isRoot ? RootFill : NodeFill)
               .Append("\" stroke=\"").Append(isRoot ? RootStroke : NodeStroke)
               .Append("\" stroke-width=\"").Append(isRoot ? "2" : "1").Append("\"/>");
-            sb.Append("<text x=\"").Append(F(n.CenterX)).Append("\" y=\"").Append(F(n.CenterY - TextLineOffsetY)).Append("\" text-anchor=\"middle\" font-size=\"").Append(F(NameFontSize)).Append("\" font-weight=\"").Append(isRoot ? "650" : "500").Append("\" fill=\"").Append(InkColor).Append("\">").Append(XmlEscape(Truncate(n.FullName))).Append("</text>");
-            sb.Append("<text x=\"").Append(F(n.CenterX)).Append("\" y=\"").Append(F(n.CenterY + LifespanLineOffsetY)).Append("\" text-anchor=\"middle\" font-size=\"").Append(F(LifespanFontSize)).Append("\" fill=\"").Append(MutedColor).Append("\">").Append(XmlEscape(n.Lifespan)).Append("</text>");
+            foreach (var line in NodeLines(n))
+            {
+                sb.Append("<text x=\"").Append(F(n.CenterX)).Append("\" y=\"").Append(F(n.CenterY + line.BaselineY))
+                  .Append("\" text-anchor=\"middle\" font-size=\"").Append(F(line.FontSize))
+                  .Append("\" font-weight=\"").Append(line.IsName ? (isRoot ? "650" : "500") : "400")
+                  .Append("\" fill=\"").Append(line.IsName ? InkColor : MutedColor).Append("\">")
+                  .Append(XmlEscape(line.Text)).Append("</text>");
+            }
+
             sb.Append("</g>");
         }
 
@@ -532,8 +555,43 @@ else
             CenterY = centerY,
             FullName = PersonDisplay.Name(i),
             MaidenSurname = i.MaidenName?.Surname ?? string.Empty,
-            Lifespan = FormatLifespan(i),
+            BirthDate = PersonDisplay.BirthDate(i) ?? string.Empty,
+            DeathDate = PersonDisplay.DeathDate(i) ?? string.Empty,
+            Lifespan = PersonDisplay.Lifespan(i),
         };
+
+    /// <summary>
+    /// Řádky v rámečku: jméno a pod ním celá data narození a úmrtí. Co osoba nemá, řádek nedostane —
+    /// prázdné „† ?" by u žijících zabíralo místo bez informace. Blok se svisle centruje, aby
+    /// osoba bez dat nevisela u horní hrany.
+    ///
+    /// Symboly jsou české genealogické (* a †); Topola kreslí v overlayi tytéž řádky s „+",
+    /// protože je to její vlastní renderer a bundle zůstává nedotčený (princip 2).
+    ///
+    /// Jediné místo, kde se text rámečku skládá — kreslí z něj náhled i export (<see cref="BuildSvgMarkup"/>).
+    /// </summary>
+    private static IReadOnlyList<NodeLine> NodeLines(LayoutNode n)
+    {
+        var lines = new List<NodeLine>(3) { new(Truncate(n.FullName), NameFontSize, 0, true) };
+
+        if (n.BirthDate.Length > 0)
+        {
+            lines.Add(new($"* {TruncateDate(n.BirthDate)}", LifespanFontSize, 0, false));
+        }
+
+        if (n.DeathDate.Length > 0)
+        {
+            lines.Add(new($"† {TruncateDate(n.DeathDate)}", LifespanFontSize, 0, false));
+        }
+
+        var top = -(lines.Count * LineHeight) * 0.5;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            lines[i] = lines[i] with { BaselineY = top + FirstBaselineY + i * LineHeight };
+        }
+
+        return lines;
+    }
 
     /// <summary>
     /// Text tooltipu. Rodné příjmení se do rámečku nevejde — jméno se v něm ořezává na
@@ -546,28 +604,6 @@ else
         return n.Lifespan.Length > 0 ? $"{name} — {n.Lifespan}" : name;
     }
 
-    private static string FormatLifespan(GedcomIndividual i)
-    {
-        var b = i.Birth?.ParsedYear;
-        var d = i.Death?.ParsedYear;
-        if (b is not null && d is not null)
-        {
-            return $"{b}–{d}";
-        }
-
-        if (b is not null)
-        {
-            return $"{b}–";
-        }
-
-        if (d is not null)
-        {
-            return $"–{d}";
-        }
-
-        return "";
-    }
-
     private static string Truncate(string s)
     {
         if (s.Length <= MaxNameChars)
@@ -576,6 +612,17 @@ else
         }
 
         return s[..(MaxNameChars - 1)] + "…";
+    }
+
+    /// <summary>Ořezané datum je v tooltipu celé — stejně jako ořezané jméno.</summary>
+    private static string TruncateDate(string s)
+    {
+        if (s.Length <= MaxDateChars)
+        {
+            return s;
+        }
+
+        return s[..(MaxDateChars - 1)] + "…";
     }
 
     private static string F(double v) => v.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -635,8 +682,18 @@ else
         /// <summary>Jen pro tooltip — do rámečku se nekreslí (viz <see cref="NodeTitle"/>).</summary>
         public required string MaidenSurname { get; set; }
 
+        /// <summary>Celé datum narození česky, nebo prázdno, když v souboru není.</summary>
+        public required string BirthDate { get; set; }
+
+        /// <summary>Celé datum úmrtí česky, nebo prázdno, když v souboru není.</summary>
+        public required string DeathDate { get; set; }
+
+        /// <summary>Obě data na jednom řádku — jen pro tooltip, kde se nic neořezává.</summary>
         public required string Lifespan { get; set; }
     }
+
+    /// <summary>Jeden řádek textu v rámečku; <see cref="BaselineY"/> je účaří proti středu uzlu.</summary>
+    private sealed record NodeLine(string Text, double FontSize, double BaselineY, bool IsName);
 
     private sealed class LineSegment
     {

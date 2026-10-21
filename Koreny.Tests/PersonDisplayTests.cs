@@ -13,51 +13,57 @@ public class PersonDisplayTests
         Death = death is null ? null : new GedcomEvent { Date = death },
     };
 
+    /// <summary>Celá data, ne roky: dva jmenovci narození v témže roce se rokem rozlišit nedají.</summary>
     [Fact]
-    public void BothYears_AreJoined()
+    public void BothDates_AreJoined()
     {
-        Assert.Equal("1901–1980", PersonDisplay.LifespanYears(Person("3 MAR 1901", "1 MAR 1980")));
+        Assert.Equal("3. 3. 1901 – 1. 3. 1980", PersonDisplay.Lifespan(Person("3 MAR 1901", "1 MAR 1980")));
     }
 
-    /// <summary>Žijící osoba: pomlčka bez druhého roku, ne prázdno — to je hlavní případ rozlišení jmenovců.</summary>
+    /// <summary>Žijící osoba: pomlčka bez druhého data, ne prázdno — to je hlavní případ rozlišení jmenovců.</summary>
     [Fact]
     public void LivingPerson_ShowsOpenRange()
     {
-        Assert.Equal("1978–", PersonDisplay.LifespanYears(Person("12 AUG 1978", null)));
+        Assert.Equal("12. 8. 1978 –", PersonDisplay.Lifespan(Person("12 AUG 1978", null)));
     }
 
     [Fact]
     public void OnlyDeathKnown_ShowsLeadingDash()
     {
-        Assert.Equal("–1980", PersonDisplay.LifespanYears(Person(null, "1 MAR 1980")));
+        Assert.Equal("– 1. 3. 1980", PersonDisplay.Lifespan(Person(null, "1 MAR 1980")));
     }
 
     /// <summary>„?" je informace („v souboru to není"), prázdno by vypadalo jako chyba zobrazení.</summary>
     [Fact]
     public void NothingKnown_ShowsQuestionMark()
     {
-        Assert.Equal("?", PersonDisplay.LifespanYears(Person(null, null)));
-        Assert.Equal("?", PersonDisplay.LifespanYears(new GedcomIndividual { Id = "I2" }));
-        Assert.Equal("?", PersonDisplay.LifespanYears(null));
+        Assert.Equal("?", PersonDisplay.Lifespan(Person(null, null)));
+        Assert.Equal("?", PersonDisplay.Lifespan(new GedcomIndividual { Id = "I2" }));
+        Assert.Equal("?", PersonDisplay.Lifespan(null));
     }
 
-    /// <summary>Událost bez data (třeba holé „BIRT Y") rok nedá — a nesmí spadnout.</summary>
+    /// <summary>Událost bez data (třeba holé „BIRT Y") datum nedá — a nesmí spadnout.</summary>
     [Fact]
     public void EventWithoutDate_CountsAsUnknown()
     {
         var person = new GedcomIndividual { Id = "I3", Birth = new GedcomEvent { Place = "Praha" } };
 
-        Assert.Equal("?", PersonDisplay.LifespanYears(person));
+        Assert.Equal("?", PersonDisplay.Lifespan(person));
+        Assert.Null(PersonDisplay.BirthDate(person));
     }
 
-    /// <summary>Neúplné či nestandardní datum se nepřepisuje — rok se z něj jen vyčte, když tam je.</summary>
+    /// <summary>
+    /// Neúplné, nejisté i nestandardní datum se ukáže celé — rok z něj vybrat by znamenalo
+    /// zahodit zrovna tu část, která říká, jak je údaj jistý.
+    /// </summary>
     [Theory]
-    [InlineData("ABT 1850", "1850–")]
-    [InlineData("BET 1840 AND 1845", "1840–")]
-    [InlineData("kolem sv. Václava", "?")]
-    public void YearIsReadFromRawDateWhenPresent(string date, string expected)
+    [InlineData("ABT 1850", "okolo 1850 –")]
+    [InlineData("BET 1840 AND 1845", "1840 .. 1845 –")]
+    [InlineData("1850", "1850 –")]
+    [InlineData("kolem sv. Václava", "kolem sv. Václava –")]
+    public void IncompleteDate_IsShownWhole(string date, string expected)
     {
-        Assert.Equal(expected, PersonDisplay.LifespanYears(Person(date, null)));
+        Assert.Equal(expected, PersonDisplay.Lifespan(Person(date, null)));
     }
 
     [Fact]
