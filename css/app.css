@@ -481,6 +481,28 @@ textarea:focus-visible,
 
 .k-status strong { color: var(--k-ink); font-weight: 650; }
 
+/* Údaje vybrané osoby pod jménem. Poznámka může být dlouhá — ořízne se na dva řádky,
+   celá je v tooltipu, aby proužek nevytlačil seznam z panelu. */
+.k-status-details {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.15rem 0.75rem;
+    margin: 0.4rem 0 0.1rem;
+}
+
+.k-status-details dt { color: var(--k-muted); }
+
+.k-status-details dd {
+    margin: 0;
+    min-width: 0;
+    color: var(--k-ink);
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
 .k-list { display: flex; flex-direction: column; gap: 2px; }
 
 .k-row {
