@@ -88,6 +88,10 @@ export function init(elementId, dataJson, rootId, dotNetRef) {
     chartType: topola.RelativesChart,
     renderer: topola.DetailedRenderer,
     svgSelector: `#${svgId}`,
+    // Topola si data vypisuje sama; bez locale by z „3 MAR 1901" nakreslila anglické „3 Mar 1901"
+    // a kvalifikátory („abt") by nechala, jak jsou. S „cs" vyjde „3. 3. 1901" a „okolo 1850" —
+    // tedy totéž, co kreslí náhled přes Services/GedcomDate.cs.
+    locale: "cs",
     animate: false, // synchronní render — funguje i ve skrytém dokumentu
     colors: topola.ChartColors ? topola.ChartColors.COLOR_BY_SEX : undefined,
     indiCallback: (info) => {

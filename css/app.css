@@ -522,12 +522,14 @@ textarea:focus-visible,
     border-left-color: var(--k-gold-deep);
 }
 
+/* Jméno a pod ním celá data narození a úmrtí — vedle sebe se na šířku panelu nevejdou. */
 .k-row-main {
     flex: 1;
     min-width: 0;
     display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.1rem;
     background: none;
     border: none;
     font: inherit;
@@ -552,6 +554,9 @@ textarea:focus-visible,
     color: var(--k-muted);
     font-variant-numeric: tabular-nums;
     flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ── Formuláře ──────────────────────────────────────────── */
@@ -702,14 +707,23 @@ textarea:focus-visible,
 
 .k-check input { accent-color: var(--k-forest); width: 1rem; height: 1rem; cursor: pointer; }
 
-/* Jméno si vezme volné místo, roky a ID zůstanou vpravo pod sebou i u dlouhých jmen. */
-.k-check-name { flex: 1 1 auto; min-width: 0; }
+/* Jméno s daty si vezme volné místo, ID zůstane vpravo i u dlouhých jmen. */
+.k-check-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.k-check-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .k-check-years {
     color: var(--k-muted);
     font-size: 0.78rem;
     font-variant-numeric: tabular-nums;
-    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .k-check-id { color: var(--k-muted); font-size: 0.78rem; flex: 0 0 auto; }
