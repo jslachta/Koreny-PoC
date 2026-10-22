@@ -1,8 +1,9 @@
 /**
- * KorenyTopola — interop modul pro Topola (PeWu/topola), Relatives chart.
+ * KorenyTopola — interop modul pro Topola (PeWu/topola). Který graf, jaký směr a jaké
+ * barvy, to říká viewJson (Services/TreeViewSettings.cs); bez něj platí Relatives chart.
  * Očekává globály `topola` (vendorovaný self-contained bundle) a `d3` (vendorované 7.9.0).
  *
- * init(elementId, dataJson, rootId, dotNetRef) — vyrenderuje rodokmen do kontejneru.
+ * init(elementId, dataJson, rootId, viewJson, dotNetRef) — vyrenderuje rodokmen do kontejneru.
  * exportSvg(elementId) — vrátí samostatný SVG string celého stromu (nezávislý na pan/zoom).
  * destroy(elementId) — odpojí listenery a vyprázdní kontejner.
  *
@@ -56,6 +57,38 @@ function patchMaidenNameRendering() {
   maidenNamePatched = true;
 }
 
+/**
+ * Volby zobrazení (Services/TreeViewSettings.cs) na konstrukty Topoly. Neznámá hodnota
+ * spadne na výchozí — nastavení z cizí nebo starší verze nesmí položit vykreslení rodokmenu.
+ */
+function chartTypeOf(name) {
+  switch (name) {
+    case "hourglass":
+      return topola.HourglassChart;
+    case "ancestors":
+      return topola.AncestorChart;
+    case "descendants":
+      return topola.DescendantChart;
+    default:
+      return topola.RelativesChart;
+  }
+}
+
+function colorsOf(name) {
+  if (!topola.ChartColors) {
+    return undefined; // jiná verze Topoly — ať si obarví po svém
+  }
+
+  switch (name) {
+    case "byGeneration":
+      return topola.ChartColors.COLOR_BY_GENERATION;
+    case "none":
+      return topola.ChartColors.NO_COLOR;
+    default:
+      return topola.ChartColors.COLOR_BY_SEX;
+  }
+}
+
 /** @type {Map<string, { svg: SVGSVGElement, container: HTMLElement }>} */
 const instances = new Map();
 
@@ -63,9 +96,10 @@ const instances = new Map();
  * @param {string} elementId id kontejnerového divu
  * @param {string} dataJson JsonGedcomData ({indis, fams}) z TopolaDataMapper
  * @param {string|null} rootId výchozí kořenová osoba (null = topola vybere sama)
+ * @param {string|null} viewJson volby zobrazení z TreeViewSettings.ToJson() (null = výchozí)
  * @param {object} dotNetRef DotNetObjectReference na TopolaTree
  */
-export function init(elementId, dataJson, rootId, dotNetRef) {
+export function init(elementId, dataJson, rootId, viewJson, dotNetRef) {
   destroy(elementId); // opakovaný init na tomtéž elementu nesmí hromadit instance
 
   const container = document.getElementById(elementId);
@@ -78,6 +112,8 @@ export function init(elementId, dataJson, rootId, dotNetRef) {
     return; // prázdný dokument — není co kreslit
   }
 
+  const viewOptions = viewJson ? JSON.parse(viewJson) : {};
+
   patchMaidenNameRendering(); // až tady: dřív nemusí být bundle `topola` na window
 
   const svgId = `${elementId}-svg`;
@@ -85,7 +121,7 @@ export function init(elementId, dataJson, rootId, dotNetRef) {
 
   const chart = topola.createChart({
     json: data,
-    chartType: topola.RelativesChart,
+    chartType: chartTypeOf(viewOptions.chartType),
     renderer: topola.DetailedRenderer,
     svgSelector: `#${svgId}`,
     // Topola si data vypisuje sama; bez locale by z „3 MAR 1901" nakreslila anglické „3 Mar 1901"
@@ -93,7 +129,8 @@ export function init(elementId, dataJson, rootId, dotNetRef) {
     // tedy totéž, co kreslí náhled přes Services/GedcomDate.cs.
     locale: "cs",
     animate: false, // synchronní render — funguje i ve skrytém dokumentu
-    colors: topola.ChartColors ? topola.ChartColors.COLOR_BY_SEX : undefined,
+    horizontal: !!viewOptions.horizontal,
+    colors: colorsOf(viewOptions.colors),
     indiCallback: (info) => {
       if (info && info.id && dotNetRef) {
         dotNetRef.invokeMethodAsync("OnPersonClicked", info.id);
