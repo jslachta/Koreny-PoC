@@ -65,6 +65,8 @@
                     <button type="button" class="k-btn k-btn--outline" @onclick="StartTreeDownload" disabled="@(_doc is null || _doc.Individuals.Count == 0 || _downloadingTree)">
                         @(_downloadingTree ? "Připravuji…" : "Stáhnout rodokmen")
                     </button>
+                    @* Nastavení patří k těmhle dvěma tlačítkům: řídí, co z nich vyleze. *@
+                    <button type="button" class="k-btn" @onclick="OpenTreeSettings">Nastavení zobrazení</button>
                 </div>
 
                 @if (_doc is not null && _doc.Individuals.Count > 0)
@@ -167,8 +169,17 @@
 {
     <TreeOverlay Document="_doc"
                  RootPersonId="@_rootPersonId"
+                 Settings="@AppState.TreeView"
                  OnPersonSelected="OnTopolaPersonSelected"
                  OnClose="CloseTopolaOverlay" />
+}
+
+@* Nastavení zobrazení rodokmenu. Dialog edituje kopii; do AppState se zapíše až „Použít". *@
+@if (_treeSettingsDraft is not null)
+{
+    <TreeSettingsDialog Draft="_treeSettingsDraft"
+                        OnApply="ApplyTreeSettings"
+                        OnCancel="CancelTreeSettings" />
 }
 
 @* Dopad mazání se počítá tady (DeletionImpact), dialog ho jen ukazuje. *@
@@ -189,6 +200,7 @@
         <TopolaTree @ref="_hiddenTopolaTree"
                     Document="@_doc"
                     RootPersonId="@_rootPersonId"
+                    Settings="@AppState.TreeView"
                     OnReady="OnHiddenTreeReadyAsync" />
     </div>
 }
@@ -226,6 +238,12 @@
 
     private bool _downloadingTree;
     private TopolaTree? _hiddenTopolaTree;
+
+    /// <summary>
+    /// Nenulové = běží dialog nastavení zobrazení; drží pracovní kopii, aby „Zrušit" nemělo
+    /// co vracet. Platné nastavení žije v AppState, takže ho přežije i přepnutí dokumentu.
+    /// </summary>
+    private TreeViewSettings? _treeSettingsDraft;
 
     /// <summary>Nenulové = běží dialog mazání osoby; drží spočítaný dopad na rodokmen.</summary>
     private PersonDeletionImpact? _deleteImpact;
@@ -364,6 +382,20 @@
     {
         _showTopolaOverlay = false;
     }
+
+    private void OpenTreeSettings() => _treeSettingsDraft = AppState.TreeView.Copy();
+
+    /// <summary>Použít: od téhle chvíle se podle nastavení kreslí zobrazení, tisk i stažení.</summary>
+    private void ApplyTreeSettings()
+    {
+        if (_treeSettingsDraft is not null)
+        {
+            AppState.TreeView = _treeSettingsDraft;
+            _treeSettingsDraft = null;
+        }
+    }
+
+    private void CancelTreeSettings() => _treeSettingsDraft = null;
 
     /// <summary>Klik na osobu v rodokmenu: přepne kořen a overlay zavře (stejné chování jako klik v HourglassTree).</summary>
     private Task OnTopolaPersonSelected(string id)
