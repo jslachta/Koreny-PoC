@@ -1,0 +1,121 @@
+@using Koreny.Services
+@using Microsoft.AspNetCore.Components.Web
+
+@* Nastavení zobrazení rodokmenu. Dialog, ne postranní panel: volba se dělá před akcí
+   („Zobrazit", „Stáhnout"), ne průběžně, a panely vedle sebe patří editaci dat.
+
+   Komponenta edituje pracovní kopii, kterou dostane zvenčí — dokud uživatel nedá „Použít",
+   stránka o změně neví a „Zrušit" tak nemá co vracet. Fokus a Esc si řeší sama, stejně
+   jako PersonDeleteDialog. *@
+
+<div class="k-modal-backdrop">
+    <div class="k-modal"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="tree-settings-title"
+         tabindex="-1"
+         @ref="_dialogRef"
+         @onkeydown="OnKeyDown">
+        <div class="k-modal-head">
+            <h2 class="k-modal-title" id="tree-settings-title">Nastavení zobrazení rodokmenu</h2>
+            <p class="k-modal-sub">Platí pro zobrazení, tisk i stažení. Drží se jen v této záložce — po obnovení stránky se vrátí výchozí hodnoty.</p>
+        </div>
+        <div class="k-modal-body">
+            <div class="k-form">
+                <div class="k-field">
+                    <label class="k-label" for="tv-chart">Typ grafu</label>
+                    <select id="tv-chart" class="k-select" @bind="Draft.ChartType">
+                        <option value="@TreeChartType.Relatives">Příbuzní</option>
+                        <option value="@TreeChartType.Hourglass">Přesýpací hodiny</option>
+                        <option value="@TreeChartType.Ancestors">Jen předci</option>
+                        <option value="@TreeChartType.Descendants">Jen potomci</option>
+                    </select>
+                    <p class="k-hint-text">@ChartTypeHint</p>
+                </div>
+
+                <div class="k-field">
+                    <label class="k-label" for="tv-orientation">Směr generací</label>
+                    <select id="tv-orientation" class="k-select" @bind="Draft.Orientation">
+                        <option value="@TreeOrientation.Vertical">Shora dolů</option>
+                        <option value="@TreeOrientation.Horizontal">Zleva doprava</option>
+                    </select>
+                    <p class="k-hint-text">Jen prohození os — kolik místa strom zabere celkem, to nemění. Na širokém monitoru se ale vodorovný strom často čte líp.</p>
+                </div>
+
+                <div class="k-field">
+                    <label class="k-label" for="tv-colors">Barvy karet</label>
+                    <select id="tv-colors" class="k-select" @bind="Draft.Coloring">
+                        <option value="@TreeColoring.BySex">Podle pohlaví</option>
+                        <option value="@TreeColoring.ByGeneration">Podle generace</option>
+                        <option value="@TreeColoring.None">Bez barev</option>
+                    </select>
+                    <p class="k-hint-text">Bez barev se rodokmen tiskne čitelně i na černobílé tiskárně.</p>
+                </div>
+            </div>
+        </div>
+        <div class="k-modal-foot">
+            <button type="button" class="k-btn k-btn--primary" @onclick="OnApply">Použít</button>
+            <button type="button" class="k-btn k-btn--outline" @onclick="ResetToDefaults" disabled="@IsDefault">Výchozí nastavení</button>
+            <span class="k-spacer"></span>
+            <button type="button" class="k-btn k-btn--ghost" @onclick="OnCancel">Zrušit</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ElementReference _dialogRef;
+
+    /// <summary>Pracovní kopie nastavení. Mutuje se přímo — vlastníkem zůstává stránka.</summary>
+    [Parameter, EditorRequired]
+    public TreeViewSettings Draft { get; set; } = null!;
+
+    [Parameter]
+    public EventCallback OnApply { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    /// <summary>
+    /// Proč je volba typu grafu první a proč u ní stojí vysvětlení: je to jediná volba, která
+    /// mění, co všechno je ve stromu vidět — ostatní dvě jsou čistě vzhledové.
+    /// </summary>
+    private string ChartTypeHint => Draft.ChartType switch
+    {
+        TreeChartType.Hourglass => "Přímá linie předků a všichni potomci vybrané osoby. Předci stojí v generačních patrech, takže strom je podstatně nižší — zmizí ale sourozenci předků a jejich rodiny.",
+        TreeChartType.Ancestors => "Jen předci vybrané osoby, nic pod ní.",
+        TreeChartType.Descendants => "Jen potomci vybrané osoby, nic nad ní.",
+        _ => "Vybraná osoba, její předci i jejich další rodiny. Ukáže nejvíc, ale roste do výšky: každá postranní větev si nad sebou drží místo pro celou svoji rodinu.",
+    };
+
+    /// <summary>Výchozí hodnoty zná jen TreeViewSettings; dialog je odsud čte, aby se s ním nemohl rozejít.</summary>
+    private static readonly TreeViewSettings Defaults = new();
+
+    private bool IsDefault =>
+        Draft.ChartType == Defaults.ChartType
+        && Draft.Orientation == Defaults.Orientation
+        && Draft.Coloring == Defaults.Coloring;
+
+    private void ResetToDefaults()
+    {
+        Draft.ChartType = Defaults.ChartType;
+        Draft.Orientation = Defaults.Orientation;
+        Draft.Coloring = Defaults.Coloring;
+    }
+
+    /// <summary>Dialog žije jen po dobu otevření, takže první render == právě se otevřel.</summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _dialogRef.FocusAsync();
+        }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await OnCancel.InvokeAsync();
+        }
+    }
+}

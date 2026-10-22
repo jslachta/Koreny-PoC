@@ -21,6 +21,14 @@
     [Parameter]
     public string? RootPersonId { get; set; }
 
+    /// <summary>
+    /// Jak strom kreslit. Čte se při mountu a dál se nesleduje — komponenta se do DOM dostává
+    /// jen přes overlay a skrytý export, a ty vznikají až po zavření dialogu nastavení,
+    /// takže se pod ní volby nemají jak změnit.
+    /// </summary>
+    [Parameter]
+    public TreeViewSettings? Settings { get; set; }
+
     [Parameter]
     public EventCallback<string> OnPersonSelected { get; set; }
 
@@ -38,7 +46,8 @@
         _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/topola-view.js");
         _selfRef = DotNetObjectReference.Create(this);
         var json = TopolaDataMapper.ToJson(Document);
-        await _module.InvokeVoidAsync("init", _elementId, json, RootPersonId, _selfRef);
+        var view = (Settings ?? new TreeViewSettings()).ToJson();
+        await _module.InvokeVoidAsync("init", _elementId, json, RootPersonId, view, _selfRef);
         _initialized = true;
 
         if (OnReady.HasDelegate)

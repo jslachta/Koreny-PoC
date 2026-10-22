@@ -1,4 +1,5 @@
 @using Koreny.Models
+@using Koreny.Services
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
@@ -38,6 +39,7 @@
         <TopolaTree @ref="_tree"
                     Document="@Document"
                     RootPersonId="@RootPersonId"
+                    Settings="@Settings"
                     OnPersonSelected="OnPersonSelected" />
     </div>
 </div>
@@ -52,6 +54,10 @@
 
     [Parameter]
     public string? RootPersonId { get; set; }
+
+    /// <summary>Jak strom kreslit — přichází ze stránky, overlay ho jen podává dál (platí i pro tisk a stažení).</summary>
+    [Parameter]
+    public TreeViewSettings? Settings { get; set; }
 
     /// <summary>Klik na osobu ve stromu — stránka si podle toho přepne kořen a overlay zavře.</summary>
     [Parameter]
