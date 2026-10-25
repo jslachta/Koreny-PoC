@@ -85,7 +85,7 @@ public class PersonDisplayTests
             {
                 ("Rodné příjmení", "Svobodová"),
                 ("Pohlaví", "žena"),
-                ("Narození", "ABT 1850, Praha"),
+                ("Narození", "okolo 1850, Praha"),
                 ("Úmrtí", "Brno"),
                 ("Poznámka", "Učitelka"),
                 ("ID", "I5"),
