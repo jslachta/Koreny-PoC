@@ -26,38 +26,42 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const EXPORT_PADDING = 20;
 
 /**
- * Dva údaje na kartě osoby, které Topola sama nenakreslí:
+ * Úpravy řádků pod jménem, které Topola sama neudělá. Obalíme `getIndiDetails`
+ * a `getFamDetails`: zavoláme původní implementaci a na její výsledek saháme zvenčí.
+ * Není to kopie knihovní logiky, takže upgrade Topoly nemá co rozbít — a kdyby některý
+ * z údajů začala kreslit sama, stačí smazat jeho pár řádků.
  *
- * - **rodné jméno** zná (`getMaidenName()` i vlastní čtečka `NAME`/`TYPE maiden`), ale žádný
- *   z jejích rendererů ho nekreslí;
+ * Na kartě osoby:
+ * - **rodné jméno** Topola zná (`getMaidenName()` i vlastní čtečka `NAME`/`TYPE maiden`),
+ *   ale žádný z jejích rendererů ho nekreslí — vložíme ho nad řádky událostí;
  * - **povolání** nezná vůbec; mapper ho posílá pod vlastním klíčem `occupation`, který pro
  *   Topolu není ničím — a je tam jen když si ho uživatel zapnul (Services/TreeViewSettings.cs).
+ *   Přijde pod události, stejné pořadí jako v náhledu vybrané osoby;
+ * - **místa** Topola kreslí sama, ale každé na vlastní řádek pod datem. Karta se čtyřmi
+ *   řádky pod sebou se přestává číst, tak je sloučíme k datu do závorky
+ *   („* 31. 7. 1980 (Godrikův Dol)"). Totéž na uzlu rodiny u sňatku.
  *
- * Obalíme proto `getIndiDetails`: zavoláme původní implementaci a její řádky
- * (* narození s místem, + úmrtí s místem) obložíme svými — „roz." nad ně, povolání pod ně,
- * stejné pořadí jako v náhledu vybrané osoby. Místa jsou v těch řádcích už od Topoly, naše
- * práce u nich není žádná. Není to kopie knihovní logiky, takže upgrade Topoly nemá co
- * rozbít — a kdyby některý z údajů začala kreslit sama, stačí smazat jeho pár řádků.
- *
- * Velikost karty si Topola dopočítá z počtu a délky řádků (`getPreferredIndiSize`), takže
- * přidaný řádek nemá jak přetéct.
+ * Velikost karty si Topola dopočítá z počtu a délky řádků (`getPreferredIndiSize`,
+ * `getPreferredFamSize`), takže ani přidaný, ani prodloužený řádek nemá jak přetéct.
  *
  * Bundle zůstává nedotčený (princip 2: jeho sha256 v lib/topola/README.md platí dál).
  */
-let indiDetailsPatched = false;
+let detailsPatched = false;
 
-function patchIndiDetailsRendering() {
-  if (indiDetailsPatched || typeof topola === "undefined" || !topola.DetailedRenderer) {
+function patchDetailsRendering() {
+  if (detailsPatched || typeof topola === "undefined" || !topola.DetailedRenderer) {
     return;
   }
 
-  const base = topola.DetailedRenderer.prototype.getIndiDetails;
-  if (typeof base !== "function") {
+  const baseIndi = topola.DetailedRenderer.prototype.getIndiDetails;
+  const baseFam = topola.DetailedRenderer.prototype.getFamDetails;
+  if (typeof baseIndi !== "function" || typeof baseFam !== "function") {
     return; // jiná verze Topoly — radši nekreslit nic než spadnout
   }
 
   topola.DetailedRenderer.prototype.getIndiDetails = function (indi) {
-    const details = base.call(this, indi);
+    const details = baseIndi.call(this, indi);
+    mergePlacesIntoDates(details, [placeOf(indi, "getBirthPlace"), placeOf(indi, "getDeathPlace")]);
 
     const maiden = typeof indi.getMaidenName === "function" ? indi.getMaidenName() : null;
     if (maiden) {
@@ -73,7 +77,55 @@ function patchIndiDetailsRendering() {
     return details;
   };
 
-  indiDetailsPatched = true;
+  topola.DetailedRenderer.prototype.getFamDetails = function (fam) {
+    const details = baseFam.call(this, fam);
+    mergePlacesIntoDates(details, [placeOf(fam, "getMarriagePlace")]);
+    return details;
+  };
+
+  detailsPatched = true;
+}
+
+/**
+ * Místo z řádků do závorky k datu téže události.
+ *
+ * Řádek s místem poznáme podle textu, ne podle pozice — a sloučíme ho jen tehdy, když řádek
+ * nad ním nese symbol události (* narození, + úmrtí, ⚭ sňatek). Topola totiž symbol dává
+ * PRVNÍMU řádku události: je-li tam datum, je první ono a místo stojí hned pod ním; chybí-li
+ * datum, je první samo místo — a to pak zůstává, jak je, i se svým symbolem. Podmínka se tak
+ * stará sama o sebe a nespoléhá na to, kolik řádků která událost zrovna má.
+ *
+ * Jde se odzadu, aby mazání nerozhodilo dosud neprojité indexy. Trim je nutný: Topola skládá
+ * datum jako [kvalifikátor, datum, text].join(" "), takže prázdné sloty nechávají mezery.
+ */
+function mergePlacesIntoDates(details, places) {
+  const wanted = places.filter(Boolean);
+  if (wanted.length === 0) {
+    return;
+  }
+
+  for (let i = details.length - 1; i > 0; i--) {
+    const line = details[i];
+    if (!wanted.some((place) => line.text === place)) {
+      continue; // není to řádek s místem
+    }
+
+    const above = details[i - 1];
+    if (!above.symbol) {
+      continue; // nad ním nezačíná událost — místo patří něčemu jinému
+    }
+
+    above.text = `${above.text.trim()} (${line.text.trim()})`;
+    details.splice(i, 1);
+  }
+}
+
+/**
+ * Místo z osoby nebo rodiny. Getter Topola má, ale starší či novější verze ho mít nemusí —
+ * bez něj se nesloučí nic a řádky zůstanou, jak byly.
+ */
+function placeOf(node, getter) {
+  return typeof node[getter] === "function" ? node[getter]() : null;
 }
 
 /**
@@ -145,7 +197,7 @@ export function init(elementId, dataJson, rootId, viewJson, dotNetRef) {
 
   const viewOptions = viewJson ? JSON.parse(viewJson) : {};
 
-  patchIndiDetailsRendering(); // až tady: dřív nemusí být bundle `topola` na window
+  patchDetailsRendering(); // až tady: dřív nemusí být bundle `topola` na window
 
   const svgId = `${elementId}-svg`;
   container.innerHTML = `<svg id="${svgId}"></svg>`;

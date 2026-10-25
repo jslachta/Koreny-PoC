@@ -245,8 +245,9 @@ public sealed class TopolaEvent
     public TopolaDateRange? DateRange { get; init; }
 
     /// <summary>
-    /// Místo (<c>PLAC</c>). Klíč, který Topola sama zná a kreslí vlastním rendererem na
-    /// samostatný řádek pod datem; je tu jen když si uživatel místo zapnul.
+    /// Místo (<c>PLAC</c>). Klíč, který Topola sama zná a kreslí vlastním rendererem;
+    /// je tu jen když si uživatel místo zapnul. Topola mu dá samostatný řádek pod datem,
+    /// patch v js/topola-view.js ho pak sloučí k datu do závorky.
     /// </summary>
     [JsonPropertyName("place")]
     public string? Place { get; init; }
