@@ -705,6 +705,9 @@ textarea:focus-visible,
 
 .k-check:hover { background: #F2EFE7; }
 
+/* Krátký výčet voleb (ne rolovatelný seznam osob jako .k-check-list) — jen svislé řazení. */
+.k-check-group { display: grid; gap: 1px; }
+
 .k-check input { accent-color: var(--k-forest); width: 1rem; height: 1rem; cursor: pointer; }
 
 /* Jméno s daty si vezme volné místo, ID zůstane vpravo i u dlouhých jmen. */
