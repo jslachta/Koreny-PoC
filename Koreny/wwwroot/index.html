@@ -21,6 +21,22 @@
             history.replaceState(null, '', path);
         }
     </script>
+    <script>
+        // Odrolování seznamu k vybranému řádku. Je tady, a ne v modulu pod js/: samostatný
+        // modul se dotahuje až při kliknutí, takže zkratka závisí na tom, jestli je v tu
+        // chvíli server k mání. Tahle funkce přijde se stránkou — když běží aplikace, běží i ona.
+        window.korenyRevealRow = function (elementId) {
+            const row = document.getElementById(elementId);
+            if (!row) {
+                return;
+            }
+
+            // Doprostřed panelu, ať je kolem řádku vidět kontext. Plynule, pokud si uživatel
+            // v systému nevypnul animace.
+            const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            row.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
+        };
+    </script>
 </head>
 
 <body>

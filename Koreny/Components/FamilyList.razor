@@ -1,5 +1,6 @@
 @using Koreny.Models
 @using Koreny.Services
+@inject IJSRuntime JSRuntime
 
 @* Seznam rodin. Zrcadlí panel osob s jedním rozdílem: výběr rodiny je jen výběr a NEmění kořen
    rodokmenu — rodina není osoba, takže by se muselo hádat, který její člen má být kořenem. *@
@@ -29,28 +30,39 @@
     </div>
 }
 
-<p class="k-status" role="status">
+@* Zkratka k řádku v seznamu, stejně jako u osob — div místo p, aby se do proužku vešla
+   řádka s tlačítkem. *@
+<div class="k-status @(Selected is null ? "" : "k-status--reveal")" role="status" @onclick="RevealSelectedAsync">
     @if (!HasFamilies)
     {
         <text>Zatím žádné rodiny.</text>
     }
     else if (Selected is { } selectedFamily)
     {
-        <text>Vybraná rodina: </text>
+        <div class="k-status-line">
+            <span class="k-status-lead">
+                <text>Vybraná rodina: </text>
 
-        <strong>@FamilyDisplay.Partners(Document, selectedFamily)</strong>
+                <strong>@FamilyDisplay.Partners(Document, selectedFamily)</strong>
 
-        <text> · @ChildrenLabel(selectedFamily)</text>
-        @if (FamilyDisplay.MarriageYear(selectedFamily) is { } marriageYear)
-        {
-            <text> · sňatek @marriageYear</text>
-        }
+                <text> · @ChildrenLabel(selectedFamily)</text>
+                @if (FamilyDisplay.MarriageYear(selectedFamily) is { } marriageYear)
+                {
+                    <text> · sňatek @marriageYear</text>
+                }
+            </span>
+            <button type="button"
+                    class="k-btn k-btn--ghost k-btn--sm k-status-reveal"
+                    @onclick="RevealSelectedAsync"
+                    @onclick:stopPropagation="true"
+                    title="Odrolovat seznam k vybrané rodině">Najít v seznamu</button>
+        </div>
     }
     else
     {
         <text>Vyberte rodinu v seznamu.</text>
     }
-</p>
+</div>
 
 <div class="k-panel-body k-panel-body--flush">
     @if (Document is null || Document.Individuals.Count == 0)
@@ -90,7 +102,7 @@
             {
                 var rowId = f.Id;
                 var selected = rowId == SelectedId;
-                <div class="k-row @(selected ? "is-selected" : "")">
+                <div class="k-row @(selected ? "is-selected" : "")" id="@RowDomId(rowId)">
                     <button type="button"
                             class="k-row-main"
                             @onclick="@(() => OnSelect.InvokeAsync(rowId))"
@@ -168,4 +180,45 @@
             : $"{family.ChildrenIds.Count} {Czech.Plural(family.ChildrenIds.Count, "dítě", "děti", "dětí")}";
 
     private Task ClearFilterAsync() => FilterChanged.InvokeAsync(string.Empty);
+
+    /// <summary>Odrolovat se dá až k vykreslenému řádku, tedy po příštím renderu — ne hned v obsluze kliknutí.</summary>
+    private bool _revealPending;
+
+    private static string RowDomId(string familyId) => $"k-family-{familyId}";
+
+    /// <summary>Ukáže vybranou rodinu v seznamu; odfiltrovanou napřed odkryje zrušením hledání (viz PersonList).</summary>
+    private async Task RevealSelectedAsync()
+    {
+        if (Selected is null)
+        {
+            return;
+        }
+
+        if (!Visible.Any(f => f.Id == SelectedId))
+        {
+            await ClearFilterAsync();
+        }
+
+        _revealPending = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_revealPending || SelectedId is null)
+        {
+            return;
+        }
+
+        _revealPending = false;
+
+        // Selhání nesmí shodit aplikaci, viz PersonList.
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("korenyRevealRow", RowDomId(SelectedId));
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            Console.WriteLine($"Odrolování k vybrané rodině selhalo: {ex.Message}");
+        }
+    }
 }
