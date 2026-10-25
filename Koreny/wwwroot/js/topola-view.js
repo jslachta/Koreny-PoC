@@ -1,6 +1,8 @@
 /**
  * KorenyTopola — interop modul pro Topola (PeWu/topola). Který graf, jaký směr a jaké
  * barvy, to říká viewJson (Services/TreeViewSettings.cs); bez něj platí Relatives chart.
+ * Co stojí na kartách (místa, povolání) tudy nejde — to si uživatel zapíná v datech,
+ * která mapper pošle v dataJson.
  * Očekává globály `topola` (vendorovaný self-contained bundle) a `d3` (vendorované 7.9.0).
  *
  * init(elementId, dataJson, rootId, viewJson, dotNetRef) — vyrenderuje rodokmen do kontejneru.
@@ -24,17 +26,28 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const EXPORT_PADDING = 20;
 
 /**
- * Topola rodné jméno zná (`getMaidenName()` i vlastní čtečka `NAME`/`TYPE maiden`), ale žádný
- * z jejích rendererů ho nekreslí. Obalíme proto `getIndiDetails`: zavoláme původní implementaci
- * a před její řádky (* narození, + úmrtí) vložíme „roz. …". Není to kopie knihovní logiky, takže
- * upgrade Topoly nemá co rozbít — a kdyby začala rodné jméno kreslit sama, stačí tohle smazat.
+ * Dva údaje na kartě osoby, které Topola sama nenakreslí:
+ *
+ * - **rodné jméno** zná (`getMaidenName()` i vlastní čtečka `NAME`/`TYPE maiden`), ale žádný
+ *   z jejích rendererů ho nekreslí;
+ * - **povolání** nezná vůbec; mapper ho posílá pod vlastním klíčem `occupation`, který pro
+ *   Topolu není ničím — a je tam jen když si ho uživatel zapnul (Services/TreeViewSettings.cs).
+ *
+ * Obalíme proto `getIndiDetails`: zavoláme původní implementaci a její řádky
+ * (* narození s místem, + úmrtí s místem) obložíme svými — „roz." nad ně, povolání pod ně,
+ * stejné pořadí jako v náhledu vybrané osoby. Místa jsou v těch řádcích už od Topoly, naše
+ * práce u nich není žádná. Není to kopie knihovní logiky, takže upgrade Topoly nemá co
+ * rozbít — a kdyby některý z údajů začala kreslit sama, stačí smazat jeho pár řádků.
+ *
+ * Velikost karty si Topola dopočítá z počtu a délky řádků (`getPreferredIndiSize`), takže
+ * přidaný řádek nemá jak přetéct.
  *
  * Bundle zůstává nedotčený (princip 2: jeho sha256 v lib/topola/README.md platí dál).
  */
-let maidenNamePatched = false;
+let indiDetailsPatched = false;
 
-function patchMaidenNameRendering() {
-  if (maidenNamePatched || typeof topola === "undefined" || !topola.DetailedRenderer) {
+function patchIndiDetailsRendering() {
+  if (indiDetailsPatched || typeof topola === "undefined" || !topola.DetailedRenderer) {
     return;
   }
 
@@ -45,16 +58,34 @@ function patchMaidenNameRendering() {
 
   topola.DetailedRenderer.prototype.getIndiDetails = function (indi) {
     const details = base.call(this, indi);
+
     const maiden = typeof indi.getMaidenName === "function" ? indi.getMaidenName() : null;
     if (maiden) {
       // Bez symbolu: hvězdička a křížek mají v rodokmenu ustálený význam, „roz." se mezi ně neplete.
       details.unshift({ symbol: "", text: `roz. ${maiden}` });
     }
 
+    const occupation = occupationOf(indi);
+    if (occupation) {
+      details.push({ symbol: "", text: occupation });
+    }
+
     return details;
   };
 
-  maidenNamePatched = true;
+  indiDetailsPatched = true;
+}
+
+/**
+ * Povolání z osoby. Přes getter, kdyby ho Topola někdy dostala, jinak ze surového JSONu —
+ * `JsonIndiDetails` si ho drží v `this.json` a my ho tam poslali.
+ */
+function occupationOf(indi) {
+  if (typeof indi.getOccupation === "function") {
+    return indi.getOccupation();
+  }
+
+  return (indi.json && indi.json.occupation) || null;
 }
 
 /**
@@ -114,7 +145,7 @@ export function init(elementId, dataJson, rootId, viewJson, dotNetRef) {
 
   const viewOptions = viewJson ? JSON.parse(viewJson) : {};
 
-  patchMaidenNameRendering(); // až tady: dřív nemusí být bundle `topola` na window
+  patchIndiDetailsRendering(); // až tady: dřív nemusí být bundle `topola` na window
 
   const svgId = `${elementId}-svg`;
   container.innerHTML = `<svg id="${svgId}"></svg>`;

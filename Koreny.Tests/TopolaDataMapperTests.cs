@@ -187,4 +187,139 @@ public class TopolaDataMapperTests
 
         Assert.Null(Indi(TopolaDataMapper.Map(doc), "I1").Birth);
     }
+
+    private static GedcomDocument DocWithPlacesAndOccupation()
+    {
+        var doc = new GedcomDocument();
+        doc.Individuals.Add(new GedcomIndividual
+        {
+            Id = "I1",
+            Occupation = "kovář",
+            Birth = new GedcomEvent { Date = "3 MAR 1901", Place = "Praha" },
+            Death = new GedcomEvent { Date = "1980", Place = "Brno" },
+        });
+        doc.Individuals.Add(new GedcomIndividual { Id = "I2" });
+        doc.Families.Add(new GedcomFamily
+        {
+            Id = "F1",
+            HusbandId = "I1",
+            WifeId = "I2",
+            Marriage = new GedcomEvent { Date = "1925", Place = "Plzeň" },
+        });
+
+        return doc;
+    }
+
+    /// <summary>
+    /// Výchozí nastavení nedá do datasetu ani místa, ani povolání — a protože Topola kreslí
+    /// jen to, co dostane, karty zůstanou kompaktní. Data v dokumentu přitom jsou.
+    /// </summary>
+    [Fact]
+    public void OptionalDetails_AreAbsentByDefault()
+    {
+        var data = TopolaDataMapper.Map(DocWithPlacesAndOccupation());
+        var i1 = Indi(data, "I1");
+
+        Assert.Null(i1.Occupation);
+        Assert.Null(i1.Birth?.Place);
+        Assert.Null(i1.Death?.Place);
+        Assert.Null(Fam(data, "F1").Marriage?.Place);
+
+        // Data samotná nezmizela: datum narození je v datasetu dál.
+        Assert.Equal(1901, i1.Birth?.Date?.Year);
+    }
+
+    /// <summary>Zapnutá volba přidá do datasetu právě svůj údaj, ne ostatní.</summary>
+    [Fact]
+    public void BirthPlace_IsMappedOnlyWhenEnabled()
+    {
+        var view = new TreeViewSettings { ShowBirthPlace = true };
+        var data = TopolaDataMapper.Map(DocWithPlacesAndOccupation(), view);
+        var i1 = Indi(data, "I1");
+
+        Assert.Equal("Praha", i1.Birth?.Place);
+        Assert.Null(i1.Death?.Place);   // vlastní volba, vlastní zaškrtávátko
+        Assert.Null(i1.Occupation);
+        Assert.Null(Fam(data, "F1").Marriage?.Place);
+    }
+
+    [Fact]
+    public void DeathAndMarriagePlace_AreMappedWhenEnabled()
+    {
+        var view = new TreeViewSettings { ShowDeathPlace = true, ShowMarriagePlace = true };
+        var data = TopolaDataMapper.Map(DocWithPlacesAndOccupation(), view);
+
+        Assert.Equal("Brno", Indi(data, "I1").Death?.Place);
+        Assert.Equal("Plzeň", Fam(data, "F1").Marriage?.Place);
+        Assert.Null(Indi(data, "I1").Birth?.Place);
+    }
+
+    /// <summary>
+    /// Povolání jde pod klíč <c>occupation</c>, který Topola sama nezná — kreslí ho až patch
+    /// v js/topola-view.js, takže vypnutá volba znamená chybějící klíč, ne jen skrytý řádek.
+    /// </summary>
+    [Fact]
+    public void Occupation_IsMappedWhenEnabled()
+    {
+        var doc = DocWithPlacesAndOccupation();
+        var view = new TreeViewSettings { ShowOccupation = true };
+
+        Assert.Equal("kovář", Indi(TopolaDataMapper.Map(doc, view), "I1").Occupation);
+        Assert.Contains("\"occupation\":\"kovář\"", TopolaDataMapper.ToJson(doc, view));
+        Assert.DoesNotContain("occupation", TopolaDataMapper.ToJson(doc));
+    }
+
+    /// <summary>
+    /// Se zapnutým místem ospravedlní událost i samotné místo: „BIRT" jen s PLAC se stane
+    /// řádkem „* Praha". Bez volby zůstává událost nenamapovaná (EventWithoutDate_IsNotMapped).
+    /// </summary>
+    [Fact]
+    public void PlaceOnlyEvent_IsMappedWhenPlaceEnabled()
+    {
+        var doc = new GedcomDocument();
+        doc.Individuals.Add(new GedcomIndividual { Id = "I1", Birth = new GedcomEvent { Place = "Praha" } });
+
+        var indi = Indi(TopolaDataMapper.Map(doc, new TreeViewSettings { ShowBirthPlace = true }), "I1");
+
+        Assert.Equal("Praha", indi.Birth?.Place);
+        Assert.Null(indi.Birth?.Date);      // datum v souboru není a dopisovat se nemá
+        Assert.Null(indi.Birth?.DateRange);
+    }
+
+    /// <summary>Prázdné PLAC („2 PLAC" bez hodnoty) řádek nepřidá ani se zapnutou volbou.</summary>
+    [Fact]
+    public void BlankPlace_IsNotMapped()
+    {
+        var doc = new GedcomDocument();
+        doc.Individuals.Add(new GedcomIndividual { Id = "I1", Birth = new GedcomEvent { Place = "   " } });
+
+        Assert.Null(Indi(TopolaDataMapper.Map(doc, new TreeViewSettings { ShowBirthPlace = true }), "I1").Birth);
+    }
+
+    /// <summary>
+    /// Volby zobrazení se čtou z vlastní kopie: <see cref="TreeViewSettings.Copy"/> musí nést
+    /// i údaje na kartách, jinak by „Zrušit" v dialogu část nastavení propsalo stejně.
+    /// </summary>
+    [Fact]
+    public void Copy_CarriesCardDetailOptions()
+    {
+        var original = new TreeViewSettings
+        {
+            ShowOccupation = true,
+            ShowBirthPlace = true,
+            ShowDeathPlace = true,
+            ShowMarriagePlace = true,
+        };
+
+        var copy = original.Copy();
+
+        Assert.True(copy.ShowOccupation);
+        Assert.True(copy.ShowBirthPlace);
+        Assert.True(copy.ShowDeathPlace);
+        Assert.True(copy.ShowMarriagePlace);
+
+        // Kopie je samostatná: změna v ní se do originálu nepropíše.
+        copy.ShowOccupation = false;
+        Assert.True(original.ShowOccupation);
+    }
 }
