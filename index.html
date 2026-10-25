@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Koreny</title>
     <base href="/Koreny-PoC/" />
-    <link href="_framework/dotnet.8f6j9f5qus.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-vEMgn0mWELz1WLkwil3PWCU4XVv2R/KKK61OmFaHzhg=" />
+    <link href="_framework/dotnet.yc8tq2wann.js" rel="preload" as="script" fetchpriority="high" crossorigin="anonymous" integrity="sha256-bg6IMSQFvnHo0NsFS/VcCG/aZsWj9RTdaZSRjVuw2iw=" />
     <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
@@ -15,20 +15,20 @@
     <script type="importmap">{
   "imports": {
     "./_framework/blazor.webassembly.js": "./_framework/blazor.webassembly.66stpp682q.js",
-    "./_framework/dotnet.js": "./_framework/dotnet.8f6j9f5qus.js",
     "./_framework/dotnet.native.js": "./_framework/dotnet.native.bjoj0wmylw.js",
-    "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.5nc8i5dl74.js"
+    "./_framework/dotnet.runtime.js": "./_framework/dotnet.runtime.5nc8i5dl74.js",
+    "./_framework/dotnet.js": "./_framework/dotnet.yc8tq2wann.js"
   },
   "scopes": {},
   "integrity": {
     "./_framework/blazor.webassembly.66stpp682q.js": "sha256-3lCWrko3zwspV40aQhs2S/IMkRSarnHRKIdkHhuXIBA=",
     "./_framework/blazor.webassembly.js": "sha256-3lCWrko3zwspV40aQhs2S/IMkRSarnHRKIdkHhuXIBA=",
-    "./_framework/dotnet.8f6j9f5qus.js": "sha256-vEMgn0mWELz1WLkwil3PWCU4XVv2R/KKK61OmFaHzhg=",
-    "./_framework/dotnet.js": "sha256-vEMgn0mWELz1WLkwil3PWCU4XVv2R/KKK61OmFaHzhg=",
+    "./_framework/dotnet.js": "sha256-bg6IMSQFvnHo0NsFS/VcCG/aZsWj9RTdaZSRjVuw2iw=",
     "./_framework/dotnet.native.bjoj0wmylw.js": "sha256-CZ0IVZkLTIvee7n1yVvOitlJWNdj/YjaFgpMgliIM64=",
     "./_framework/dotnet.native.js": "sha256-CZ0IVZkLTIvee7n1yVvOitlJWNdj/YjaFgpMgliIM64=",
     "./_framework/dotnet.runtime.5nc8i5dl74.js": "sha256-/3dBg9sj1yLD3h0PDMHnNUXWs/2zWwIMEzom1Xz3Q40=",
-    "./_framework/dotnet.runtime.js": "sha256-/3dBg9sj1yLD3h0PDMHnNUXWs/2zWwIMEzom1Xz3Q40="
+    "./_framework/dotnet.runtime.js": "sha256-/3dBg9sj1yLD3h0PDMHnNUXWs/2zWwIMEzom1Xz3Q40=",
+    "./_framework/dotnet.yc8tq2wann.js": "sha256-bg6IMSQFvnHo0NsFS/VcCG/aZsWj9RTdaZSRjVuw2iw="
   }
 }</script>
     <script>
@@ -38,6 +38,22 @@
             sessionStorage.removeItem('redirectPath');
             history.replaceState(null, '', path);
         }
+    </script>
+    <script>
+        // Odrolování seznamu k vybranému řádku. Je tady, a ne v modulu pod js/: samostatný
+        // modul se dotahuje až při kliknutí, takže zkratka závisí na tom, jestli je v tu
+        // chvíli server k mání. Tahle funkce přijde se stránkou — když běží aplikace, běží i ona.
+        window.korenyRevealRow = function (elementId) {
+            const row = document.getElementById(elementId);
+            if (!row) {
+                return;
+            }
+
+            // Doprostřed panelu, ať je kolem řádku vidět kontext. Plynule, pokud si uživatel
+            // v systému nevypnul animace.
+            const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            row.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
+        };
     </script>
 </head>
 
