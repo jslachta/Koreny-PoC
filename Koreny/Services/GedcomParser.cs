@@ -14,6 +14,7 @@ namespace Koreny.Services;
 /// podtagy) do doménového modelu; každý <see cref="GedcomIndividual"/>/<see cref="GedcomFamily"/>
 /// si drží referenci na svůj <see cref="GedcomNode"/>. Rozpoznávání tagů odpovídá
 /// původnímu parseru (poslední výskyt vyhrává u NAME/BIRT/DEAT/MARR, NOTE se hromadí).
+/// U OCCU, který přibyl později, vyhrává první výskyt (viz <see cref="GedcomIndividual.Occupation"/>).
 /// </summary>
 public class GedcomParser
 {
@@ -122,6 +123,9 @@ public class GedcomParser
                     break;
                 case "DEAT":
                     indi.Death = ProjectEvent(c);
+                    break;
+                case "OCCU":
+                    indi.Occupation ??= c.Value.Trim(); // vyhrává první, stejně jako u zápisu
                     break;
                 case "NOTE":
                     indi.Notes.Add(c.Value);

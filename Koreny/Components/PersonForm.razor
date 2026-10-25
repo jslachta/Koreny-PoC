@@ -47,6 +47,11 @@
             <input id="p-dplace" class="k-input" @bind="Form.DeathPlace" />
         </div>
         <div class="k-field">
+            <label class="k-label" for="p-occu">Povolání</label>
+            <input id="p-occu" class="k-input" @bind="Form.Occupation" placeholder="např. mlynář" />
+            <p class="k-hint-text">Ukládá se jako <code>OCCU</code>. Osoba může mít v souboru povolání víc; editor pracuje s prvním, ostatní zůstanou nedotčená.</p>
+        </div>
+        <div class="k-field">
             <label class="k-label" for="p-note">Poznámka</label>
             <input id="p-note" class="k-input" @bind="Form.NoteFirst" />
         </div>

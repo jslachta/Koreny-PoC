@@ -77,8 +77,9 @@ public class PersonDisplayTests
             Sex = "F",
             Birth = new GedcomEvent { Date = "ABT 1850", Place = "Praha" },
             Death = new GedcomEvent { Place = "Brno" },
+            Occupation = "učitelka",
         };
-        person.Notes.Add("Učitelka");
+        person.Notes.Add("Učila na obecné škole");
 
         Assert.Equal(
             new (string, string)[]
@@ -87,7 +88,8 @@ public class PersonDisplayTests
                 ("Pohlaví", "žena"),
                 ("Narození", "okolo 1850, Praha"),
                 ("Úmrtí", "Brno"),
-                ("Poznámka", "Učitelka"),
+                ("Povolání", "učitelka"),
+                ("Poznámka", "Učila na obecné škole"),
                 ("ID", "I5"),
             },
             PersonDisplay.Details(person));

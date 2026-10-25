@@ -106,7 +106,8 @@ uprostřed rodokmenu za sebou nechá díru: potomci nepřijdou jen o rodiče, al
 větev předků. Proto je vedle mazání volba **„zachovat jako neznámou osobu"**
 (`GedcomSync.AnonymizeIndividual`): záznam zůstane, drží všechny vazby, ale přijde o veškerý
 identifikující obsah — včetně tagů, kterým editor nerozumí. Ponechat je by z „neznámé osoby"
-udělalo lež: uživatel by viděl prázdný formulář a v exportu by zůstalo povolání i poznámka.
+udělalo lež: uživatel by viděl prázdný formulář a v exportu by zůstal křestní záznam
+i proprietární identifikátor.
 Ztráta dat je tu zamýšlená; proti smazání celého záznamu je to pořád ta šetrnější varianta.
 
 ## 8. Jediný nedůvěryhodný vstup je soubor

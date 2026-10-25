@@ -85,6 +85,11 @@ public static class PersonDisplay
             details.Add(("Úmrtí", death));
         }
 
+        if (person.Occupation?.Trim() is { Length: > 0 } occupation)
+        {
+            details.Add(("Povolání", occupation));
+        }
+
         if (person.Notes.FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) is { } note)
         {
             details.Add(("Poznámka", note.Trim()));
