@@ -1,5 +1,6 @@
 @using Koreny.Models
 @using Koreny.Services
+@inject IJSRuntime JSRuntime
 
 @* Seznam osob: hledání, stavový řádek, řádky. Řazení i filtrování je tady, protože nikdo jiný
    je nepotřebuje — hledaný výraz ale vlastní stránka, aby ho načtení nového dokumentu vynulovalo. *@
@@ -31,16 +32,28 @@
 
 @* Jméno z dokumentu jde do stránky jako text, ne jako HTML (princip 8). *@
 @* div, ne p — údaje osoby jsou seznam <dl>, který v odstavci být nesmí. *@
-<div class="k-status" role="status">
+@* Proužek je zároveň zkratkou k řádku v seznamu: osoba se vybírá i v rodokmenu, kde ji
+   nic neodroluje, a hledat ji pak očima mezi stovkami jmen je zdržení. Klikatelný je celý,
+   tlačítko je tu kvůli viditelnosti té zkratky a kvůli klávesnici. *@
+<div class="k-status @(Selected is null ? "" : "k-status--reveal")" role="status" @onclick="RevealSelectedAsync">
     @if (!HasPeople)
     {
         <text>Zatím žádné osoby.</text>
     }
     else if (Selected is { } selectedPerson)
     {
-        <text>Vybraná osoba: </text>
+        <div class="k-status-line">
+            <span class="k-status-lead">
+                <text>Vybraná osoba: </text>
 
-        <strong>@PersonDisplay.Name(selectedPerson)</strong>
+                <strong>@PersonDisplay.Name(selectedPerson)</strong>
+            </span>
+            <button type="button"
+                    class="k-btn k-btn--ghost k-btn--sm k-status-reveal"
+                    @onclick="RevealSelectedAsync"
+                    @onclick:stopPropagation="true"
+                    title="Odrolovat seznam k vybrané osobě">Najít v seznamu</button>
+        </div>
 
         <dl class="k-status-details">
             @foreach (var (label, value) in PersonDisplay.Details(selectedPerson))
@@ -83,7 +96,7 @@
             {
                 var rowId = p.Id;
                 var selected = rowId == SelectedId;
-                <div class="k-row @(selected ? "is-selected" : "")">
+                <div class="k-row @(selected ? "is-selected" : "")" id="@RowDomId(rowId)">
                     <button type="button"
                             class="k-row-main"
                             @onclick="@(() => OnSelect.InvokeAsync(rowId))"
@@ -151,4 +164,51 @@
             : Document.Individuals.FirstOrDefault(x => x.Id == SelectedId);
 
     private Task ClearFilterAsync() => FilterChanged.InvokeAsync(string.Empty);
+
+    /// <summary>Odrolovat se dá až k vykreslenému řádku, tedy po příštím renderu — ne hned v obsluze kliknutí.</summary>
+    private bool _revealPending;
+
+    private static string RowDomId(string personId) => $"k-person-{personId}";
+
+    /// <summary>
+    /// Ukáže vybranou osobu v seznamu. Když ji vyřadilo hledání, hledání se zruší — uživatel
+    /// chtěl tu osobu vidět, a prázdný seznam s hláškou „nikdo nenalezen" by byl horší odpověď
+    /// než zahozený filtr, který je jedním úhozem zpátky.
+    /// </summary>
+    private async Task RevealSelectedAsync()
+    {
+        if (Selected is null)
+        {
+            return;
+        }
+
+        if (!Visible.Any(p => p.Id == SelectedId))
+        {
+            await ClearFilterAsync();
+        }
+
+        _revealPending = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_revealPending || SelectedId is null)
+        {
+            return;
+        }
+
+        _revealPending = false;
+
+        // Odrolování je pohodlí, ne práce s dokumentem: výjimka z renderu by shodila celou
+        // aplikaci a s ní rozpracovanou transakci (princip 4). Do konzole se to napíše,
+        // aby tiché nic nebylo jediná stopa.
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("korenyRevealRow", RowDomId(SelectedId));
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            Console.WriteLine($"Odrolování k vybrané osobě selhalo: {ex.Message}");
+        }
+    }
 }

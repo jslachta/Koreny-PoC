@@ -481,6 +481,27 @@ textarea:focus-visible,
 
 .k-status strong { color: var(--k-ink); font-weight: 650; }
 
+/* Proužek vybraného záznamu je i zkratkou k jeho řádku v seznamu. */
+.k-status--reveal { cursor: pointer; }
+.k-status--reveal:hover { background: #FCFBF8; }
+
+.k-status-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+/* Jméno se smí oříznout, tlačítko ne — jinak by dlouhá dvojice jmen vytlačila zkratku z proužku. */
+.k-status-lead {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.k-status-reveal { flex: 0 0 auto; }
+
 /* Údaje vybrané osoby pod jménem. Poznámka může být dlouhá — ořízne se na dva řádky,
    celá je v tooltipu, aby proužek nevytlačil seznam z panelu. */
 .k-status-details {
