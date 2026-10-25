@@ -45,8 +45,9 @@
 
         _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/topola-view.js");
         _selfRef = DotNetObjectReference.Create(this);
-        var json = TopolaDataMapper.ToJson(Document);
-        var view = (Settings ?? new TreeViewSettings()).ToJson();
+        var settings = Settings ?? new TreeViewSettings();
+        var json = TopolaDataMapper.ToJson(Document, settings); // volitelné údaje na kartách filtruje mapper
+        var view = settings.ToJson();
         await _module.InvokeVoidAsync("init", _elementId, json, RootPersonId, view, _selfRef);
         _initialized = true;
 

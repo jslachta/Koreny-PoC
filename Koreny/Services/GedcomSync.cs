@@ -7,14 +7,15 @@ namespace Koreny.Services;
 /// (viz docs/audit-gedcom.md, sekce 4, krok 3).
 ///
 /// Přepisuje/vytváří/maže VÝHRADNĚ uzly, které UI umí editovat: u osoby NAME, SEX,
-/// BIRT/DATE/PLAC, DEAT/DATE/PLAC, NOTE; u rodiny HUSB, WIFE, CHIL, MARR/DATE/PLAC, NOTE.
-/// Sourozenecké uzly, kterým UI nerozumí (_MHID, OCCU, CHR, citace SOUR, FAMC/PEDI…),
+/// BIRT/DATE/PLAC, DEAT/DATE/PLAC, OCCU, NOTE; u rodiny HUSB, WIFE, CHIL, MARR/DATE/PLAC, NOTE.
+/// Sourozenecké uzly, kterým UI nerozumí (_MHID, CHR, EVEN, citace SOUR, FAMC/PEDI…),
 /// zůstávají nedotčené na svém místě.
 ///
 /// Známé tagy s možným vícenásobným výskytem (NAME, BIRT, DEAT, MARR) se synchronizují
 /// na POSLEDNÍM výskytu — stejně, jako je čte projekce (poslední vyhrává). Neupravená
 /// osoba/rodina se tak přepíše sama na sebe a její případné další výskyty téhož tagu
-/// zůstanou zachovány.
+/// zůstanou zachovány. Výjimkou je OCCU: čte i zapisuje se PRVNÍ výskyt, protože
+/// opakované OCCU není chyba exportu, ale legitimní záznam několika zaměstnání.
 /// </summary>
 public static class GedcomSync
 {
@@ -32,6 +33,7 @@ public static class GedcomSync
         SetSingleValue(node, "SEX", ind.Sex);
         SyncEvent(node, "BIRT", ind.Birth);
         SyncEvent(node, "DEAT", ind.Death);
+        SetFirstValue(node, "OCCU", ind.Occupation);
         SyncNotes(node, ind.Notes);
     }
 
@@ -94,10 +96,10 @@ public static class GedcomSync
     /// identifikující obsah — potomci tak neztratí rodiče ani prarodiče, jen se stanou
     /// dětmi neznámé osoby.
     ///
-    /// Zahazuje se VŠE kromě FAMC/FAMS, tedy i tagy, kterým editor nerozumí (OCCU, CHR,
+    /// Zahazuje se VŠE kromě FAMC/FAMS, tedy i tagy, kterým editor nerozumí (CHR, EVEN,
     /// citace, _MHID…). Ponechat je by z „neznámé osoby" udělalo lež: uživatel vidí prázdné
-    /// políčko a v exportu by zůstalo povolání i rodné číslo. Ztráta dat je tu zamýšlená —
-    /// proti smazání celého záznamu je to pořád ta šetrnější varianta.
+    /// políčko a v exportu by zůstalo rodné číslo i druhé povolání. Ztráta dat je tu
+    /// zamýšlená — proti smazání celého záznamu je to pořád ta šetrnější varianta.
     /// </summary>
     public static void AnonymizeIndividual(GedcomDocument doc, GedcomIndividual ind)
     {
@@ -106,6 +108,7 @@ public static class GedcomSync
         ind.Sex = null;
         ind.Birth = null;
         ind.Death = null;
+        ind.Occupation = null;
         ind.Notes.Clear();
 
         var node = ind.SourceNode;
@@ -238,6 +241,35 @@ public static class GedcomSync
     private static void SetSingleValue(GedcomNode parent, string tag, string? value)
     {
         var existing = parent.LastChild(tag);
+        if (string.IsNullOrEmpty(value))
+        {
+            if (existing is not null)
+            {
+                parent.Children.Remove(existing);
+            }
+
+            return;
+        }
+
+        if (existing is null)
+        {
+            parent.Children.Add(new GedcomNode(tag, value: value));
+        }
+        else
+        {
+            existing.Value = value;
+        }
+    }
+
+    /// <summary>
+    /// Nastaví hodnotu PRVNÍHO výskytu tagu — tam, odkud ji čte i projekce (OCCU).
+    /// Prázdná hodnota ten jeden uzel odstraní i s podtagy: DATE/PLAC/ADDR pod OCCU patří
+    /// k tomu konkrétnímu zaměstnání, ne k osobě, takže je nelze nechat osiřelé. Případné
+    /// další výskyty téhož tagu zůstávají nedotčené — editor o nich neví.
+    /// </summary>
+    private static void SetFirstValue(GedcomNode parent, string tag, string? value)
+    {
+        var existing = parent.FirstChild(tag);
         if (string.IsNullOrEmpty(value))
         {
             if (existing is not null)

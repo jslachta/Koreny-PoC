@@ -6,7 +6,7 @@ namespace Koreny.Tests;
 /// <summary>
 /// „Zachovat jako neznámou osobu" je alternativa ke smazání: vazby přežijí, identita ne.
 /// Slib musí platit i pro tagy, kterým editor nerozumí — jinak by uživatel viděl prázdný
-/// formulář a v exportu by zůstalo povolání i poznámka (docs/principy.md, principy 5 a 7).
+/// formulář a v exportu by zůstalo rodné číslo i poznámka (docs/principy.md, principy 5 a 7).
 /// </summary>
 public class GedcomAnonymizeTests
 {
@@ -40,7 +40,7 @@ public class GedcomAnonymizeTests
 
         Assert.Equal(new[] { "FAMC", "FAMS" }, person.SourceNode!.Children.Select(c => c.Tag));
         Assert.DoesNotContain("Petr", exported);
-        Assert.DoesNotContain("Kovář", exported);        // tag mimo editor
+        Assert.DoesNotContain("Kovář", exported);        // povolání
         Assert.DoesNotContain("Nemoc v rodině", exported);
         Assert.DoesNotContain("_MHID", exported);
         Assert.DoesNotContain("1 SEX", exported);

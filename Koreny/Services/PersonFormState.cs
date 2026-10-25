@@ -26,6 +26,10 @@ public sealed class PersonFormState
     public string BirthPlace { get; set; } = string.Empty;
     public string DeathDate { get; set; } = string.Empty;
     public string DeathPlace { get; set; } = string.Empty;
+
+    /// <summary>Povolání (OCCU). Prázdné = osoba povolání v souboru nemá.</summary>
+    public string Occupation { get; set; } = string.Empty;
+
     public string NoteFirst { get; set; } = string.Empty;
 
     // Zachovávaná, needitovaná data (mimo UI).
@@ -68,6 +72,8 @@ public sealed class PersonFormState
         DeathDate = ind.Death?.Date ?? string.Empty;
         DeathPlace = ind.Death?.Place ?? string.Empty;
 
+        Occupation = ind.Occupation ?? string.Empty;
+
         _extraNotes.Clear();
         for (var i = 1; i < ind.Notes.Count; i++)
         {
@@ -84,6 +90,7 @@ public sealed class PersonFormState
         ApplySex(ind);
         ind.Birth = GedcomFormValues.BuildEvent(_birthPresent, BirthDate, BirthPlace);
         ind.Death = GedcomFormValues.BuildEvent(_deathPresent, DeathDate, DeathPlace);
+        ind.Occupation = GedcomFormValues.NullIfEmpty(Occupation.Trim());
         ApplyNotes(ind);
     }
 

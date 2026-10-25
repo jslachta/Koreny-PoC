@@ -51,6 +51,31 @@
                     </select>
                     <p class="k-hint-text">Bez barev se rodokmen tiskne čitelně i na černobílé tiskárně.</p>
                 </div>
+
+                @* Volby obsahu jsou až za vzhledovými a v samostatné skupině: nemění, KOHO strom
+                   ukáže (to umí jen typ grafu), ale co stojí na kartě. Všechny výchozí vypnuté. *@
+                <fieldset class="k-fieldset">
+                    <legend class="k-legend">Údaje na kartách</legend>
+                    <div class="k-check-group">
+                        <label class="k-check">
+                            <input type="checkbox" @bind="Draft.ShowOccupation" />
+                            <span class="k-check-text">Povolání</span>
+                        </label>
+                        <label class="k-check">
+                            <input type="checkbox" @bind="Draft.ShowBirthPlace" />
+                            <span class="k-check-text">Místo narození</span>
+                        </label>
+                        <label class="k-check">
+                            <input type="checkbox" @bind="Draft.ShowDeathPlace" />
+                            <span class="k-check-text">Místo úmrtí</span>
+                        </label>
+                        <label class="k-check">
+                            <input type="checkbox" @bind="Draft.ShowMarriagePlace" />
+                            <span class="k-check-text">Místo sňatku</span>
+                        </label>
+                    </div>
+                    <p class="k-hint-text">Místa stojí v závorce u data („* 3. 3. 1901 (Praha)“), povolání na vlastním řádku. Obojí kartu zvětší, a s ní celý strom — proto jsou výchozí vypnuté. Co osoba v souboru nemá, nepřidá nic. Místo sňatku stojí u značky ⚭ mezi partnery, ne na kartách.</p>
+                </fieldset>
             </div>
         </div>
         <div class="k-modal-foot">
@@ -93,13 +118,21 @@
     private bool IsDefault =>
         Draft.ChartType == Defaults.ChartType
         && Draft.Orientation == Defaults.Orientation
-        && Draft.Coloring == Defaults.Coloring;
+        && Draft.Coloring == Defaults.Coloring
+        && Draft.ShowOccupation == Defaults.ShowOccupation
+        && Draft.ShowBirthPlace == Defaults.ShowBirthPlace
+        && Draft.ShowDeathPlace == Defaults.ShowDeathPlace
+        && Draft.ShowMarriagePlace == Defaults.ShowMarriagePlace;
 
     private void ResetToDefaults()
     {
         Draft.ChartType = Defaults.ChartType;
         Draft.Orientation = Defaults.Orientation;
         Draft.Coloring = Defaults.Coloring;
+        Draft.ShowOccupation = Defaults.ShowOccupation;
+        Draft.ShowBirthPlace = Defaults.ShowBirthPlace;
+        Draft.ShowDeathPlace = Defaults.ShowDeathPlace;
+        Draft.ShowMarriagePlace = Defaults.ShowMarriagePlace;
     }
 
     /// <summary>Dialog žije jen po dobu otevření, takže první render == právě se otevřel.</summary>

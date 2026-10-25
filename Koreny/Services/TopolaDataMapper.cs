@@ -24,7 +24,12 @@ namespace Koreny.Services;
 ///   a co se přečíst nedá, jde dál jako <c>text</c>. Vypsat si je Topola umí sama (locale „cs"
 ///   nastavuje js/topola-view.js), takže v overlayi stojí „3. 3. 1901" a ne jen rok;
 /// - <c>maidenName</c> = rodné PŘÍJMENÍ (ne celé jméno), stejně jak ho plní vlastní GEDCOM
-///   čtečka Topoly — kreslí ho až obalení rendereru v js/topola-view.js.
+///   čtečka Topoly — kreslí ho až obalení rendereru v js/topola-view.js;
+/// - <c>place</c> u narození, úmrtí a sňatku a <c>occupation</c> u osoby jen tehdy, když si
+///   je uživatel zapnul v <see cref="TreeViewSettings"/>. Volitelné údaje se filtrují tady,
+///   v datech, ne v rendereru: místa kreslí Topola sama (<c>getIndiDetails</c>,
+///   <c>getFamDetails</c>) a vypnout je v ní by znamenalo přepsat celou tu metodu.
+///   Čím mapper dataset nenaplní, to nemá co nakreslit.
 /// </summary>
 public static class TopolaDataMapper
 {
@@ -34,11 +39,16 @@ public static class TopolaDataMapper
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static string ToJson(GedcomDocument doc) =>
-        JsonSerializer.Serialize(Map(doc), JsonOpts);
+    /// <param name="view">
+    /// Volby zobrazení; <c>null</c> = výchozí, tedy bez volitelných údajů na kartách.
+    /// </param>
+    public static string ToJson(GedcomDocument doc, TreeViewSettings? view = null) =>
+        JsonSerializer.Serialize(Map(doc, view), JsonOpts);
 
-    public static TopolaData Map(GedcomDocument doc)
+    /// <inheritdoc cref="ToJson"/>
+    public static TopolaData Map(GedcomDocument doc, TreeViewSettings? view = null)
     {
+        view ??= new TreeViewSettings();
         var data = new TopolaData();
 
         foreach (var ind in doc.Individuals)
@@ -50,8 +60,9 @@ public static class TopolaDataMapper
                 LastName = NullIfEmpty(ind.Name?.Surname),
                 MaidenName = NullIfEmpty(ind.MaidenName?.Surname),
                 Sex = ind.Sex is "M" or "F" ? ind.Sex : null,
-                Birth = MakeEvent(ind.Birth),
-                Death = MakeEvent(ind.Death),
+                Occupation = view.ShowOccupation ? NullIfEmpty(ind.Occupation)?.Trim() : null,
+                Birth = MakeEvent(ind.Birth, view.ShowBirthPlace),
+                Death = MakeEvent(ind.Death, view.ShowDeathPlace),
             };
 
             var famc = doc.FindFamilyAsChild(ind.Id);
@@ -84,7 +95,7 @@ public static class TopolaDataMapper
                 Id = fam.Id,
                 Husb = ExistingId(doc, fam.HusbandId),
                 Wife = ExistingId(doc, fam.WifeId),
-                Marriage = MakeEvent(fam.Marriage),
+                Marriage = MakeEvent(fam.Marriage, view.ShowMarriagePlace),
             };
 
             foreach (var c in fam.ChildrenIds)
@@ -113,27 +124,30 @@ public static class TopolaDataMapper
     /// by nakreslila jen rok. Čte ho <see cref="GedcomDate"/> stejnými pravidly, jaká má Topola
     /// ve své GEDCOM čtečce, takže náhled i overlay ukazují tentýž text.
     /// </summary>
-    private static TopolaEvent? MakeEvent(GedcomEvent? ev)
+    /// <param name="includePlace">
+    /// Zda do události patří i <c>PLAC</c>. Místo samo o sobě událost ospravedlní: „BIRT"
+    /// jen s místem dá se zapnutou volbou řádek „* Praha", bez volby nedá nic.
+    /// </param>
+    private static TopolaEvent? MakeEvent(GedcomEvent? ev, bool includePlace)
     {
+        var place = includePlace ? NullIfEmpty(ev?.Place)?.Trim() : null;
         var value = GedcomDate.Parse(ev?.Date);
-        if (value is null)
+
+        var date = MakeDate(value?.Date);
+        var from = MakeDate(value?.From);
+        var to = MakeDate(value?.To);
+
+        if (date is null && from is null && to is null && place is null)
         {
+            // Prázdná událost (holé „BIRT Y", „BEF" bez data) by jen přidala řádek.
             return null;
-        }
-
-        var date = MakeDate(value.Date);
-        var from = MakeDate(value.From);
-        var to = MakeDate(value.To);
-
-        if (date is null && from is null && to is null)
-        {
-            return null; // „BEF" bez data: hranice není a prázdná událost by jen přidala řádek
         }
 
         return new TopolaEvent
         {
             Date = date,
             DateRange = from is null && to is null ? null : new TopolaDateRange { From = from, To = to },
+            Place = place,
         };
     }
 
@@ -181,6 +195,15 @@ public sealed class TopolaIndi
     [JsonPropertyName("sex")]
     public string? Sex { get; init; }
 
+    /// <summary>
+    /// Povolání. Topola tenhle pojem nezná vůbec — klíč je náš a čte ho jen patch
+    /// v js/topola-view.js, pro samotnou Topolu je to neznámé pole, které ignoruje.
+    /// Je tu jen když si ho uživatel zapnul; vypnutá volba znamená chybějící klíč,
+    /// takže se nemá co nakreslit.
+    /// </summary>
+    [JsonPropertyName("occupation")]
+    public string? Occupation { get; init; }
+
     [JsonPropertyName("famc")]
     public string? Famc { get; set; }
 
@@ -220,6 +243,14 @@ public sealed class TopolaEvent
     /// <summary>Rozmezí („BET … AND …", „BEF …"); Topola ho vypíše jako „x .. y", „před x", „po x".</summary>
     [JsonPropertyName("dateRange")]
     public TopolaDateRange? DateRange { get; init; }
+
+    /// <summary>
+    /// Místo (<c>PLAC</c>). Klíč, který Topola sama zná a kreslí vlastním rendererem;
+    /// je tu jen když si uživatel místo zapnul. Topola mu dá samostatný řádek pod datem,
+    /// patch v js/topola-view.js ho pak sloučí k datu do závorky.
+    /// </summary>
+    [JsonPropertyName("place")]
+    public string? Place { get; init; }
 }
 
 public sealed class TopolaDateRange

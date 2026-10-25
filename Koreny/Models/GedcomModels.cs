@@ -123,6 +123,17 @@ public class GedcomIndividual
     public string? Sex { get; set; }
     public GedcomEvent? Birth { get; set; }
     public GedcomEvent? Death { get; set; }
+
+    /// <summary>
+    /// Povolání — v GEDCOM 5.5.1 atribut <c>OCCU</c> pod <c>INDI</c>.
+    ///
+    /// Vyhrává PRVNÍ výskyt, stejně jako u rodného jména. Na rozdíl od BIRT/DEAT se OCCU
+    /// smí legitimně opakovat (jedno na každé zaměstnání s vlastním DATE/PLAC), takže tady
+    /// nejde o „poslední přepíše", ale o „editor umí jedno a ostatní nechá být": další
+    /// výskyty zůstávají v surovém stromu nedotčené (princip 3).
+    /// </summary>
+    public string? Occupation { get; set; }
+
     public List<string> Notes { get; } = new();
 
     /// <summary>Uzel INDI ve stromu, z něhož je tato osoba projekcí. Editace se přes něj promítají do exportu.</summary>

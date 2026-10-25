@@ -57,7 +57,9 @@ public static class PersonDisplay
     /// Údaje osoby pro proužek s vybranou osobou jako dvojice popisek–hodnota, v pořadí formuláře.
     /// Na rozdíl od <see cref="Lifespan"/> se chybějící údaj vynechá: tady nejde o rozlišení
     /// jmenovců, ale o přehled, a řádek „Úmrtí: ?" by u žijících zabíral místo bez informace.
-    /// Datum se ukazuje surové, tak jak je v souboru (princip 3).
+    /// Datum se píše česky přes <see cref="GedcomDate"/>, stejně jako v seznamu a v rodokmenu —
+    /// proužek stojí přímo nad seznamem, takže „BET 1960 AND 1965" vedle „1960 .. 1965" by
+    /// vypadalo jako dva různé údaje. Surové datum v souboru zůstává nedotčené (princip 3).
     /// </summary>
     public static IReadOnlyList<(string Label, string Value)> Details(GedcomIndividual person)
     {
@@ -81,6 +83,11 @@ public static class PersonDisplay
         if (EventText(person.Death) is { } death)
         {
             details.Add(("Úmrtí", death));
+        }
+
+        if (person.Occupation?.Trim() is { Length: > 0 } occupation)
+        {
+            details.Add(("Povolání", occupation));
         }
 
         if (person.Notes.FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) is { } note)
@@ -107,10 +114,10 @@ public static class PersonDisplay
         var other => other,
     };
 
-    /// <summary>„3 MAR 1901, Praha"; událost bez data i místa (holé „BIRT Y") nemá co ukázat.</summary>
+    /// <summary>„3. 3. 1901, Praha"; událost bez data i místa (holé „BIRT Y") nemá co ukázat.</summary>
     private static string? EventText(GedcomEvent? ev)
     {
-        var parts = new[] { ev?.Date?.Trim(), ev?.Place?.Trim() }.Where(s => !string.IsNullOrEmpty(s));
+        var parts = new[] { GedcomDate.Format(ev?.Date), ev?.Place?.Trim() }.Where(s => !string.IsNullOrEmpty(s));
         var text = string.Join(", ", parts);
         return text.Length == 0 ? null : text;
     }
