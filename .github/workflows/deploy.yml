@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   deploy:
@@ -47,6 +49,8 @@ jobs:
         run: touch publish/wwwroot/.nojekyll
 
       - name: Deploy
+        # Na PR jen ověřit, že test, publish i úprava index.html projdou; nasazuje se až push do main.
+        if: github.event_name == 'push'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
