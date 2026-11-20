@@ -31,9 +31,9 @@
     </div>
 </header>
 
-@if (!string.IsNullOrEmpty(_loadError))
+@if (!string.IsNullOrEmpty(_errorMessage))
 {
-    <p class="k-alert" role="alert">@_loadError</p>
+    <p class="k-alert" role="alert">@_errorMessage</p>
 }
 
 <div class="k-layout">
@@ -207,7 +207,7 @@
 
 @code {
     private GedcomDocument? _doc;
-    private string? _loadError;
+    private string? _errorMessage;
     private string? _rootPersonId;
     private bool _dirty; // neuložené editace od posledního načtení/exportu
 
@@ -343,8 +343,8 @@
 
         try
         {
-            var module = await GetUnsavedGuardModuleAsync();
-            await module.InvokeVoidAsync(_dirty ? "arm" : "disarm");
+            _unsavedGuardModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/unsaved-guard.js");
+            await _unsavedGuardModule.InvokeVoidAsync(_dirty ? "arm" : "disarm");
             _unsavedGuardArmed = _dirty;
         }
         catch (JSDisconnectedException)
@@ -360,12 +360,6 @@
             // Zkoušet to při každém renderu znovu nemá smysl, modul se sám neobjeví.
             _unsavedGuardUnavailable = true;
         }
-    }
-
-    private async ValueTask<IJSObjectReference> GetUnsavedGuardModuleAsync()
-    {
-        _unsavedGuardModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/unsaved-guard.js");
-        return _unsavedGuardModule;
     }
 
     private void OpenTopolaOverlay()
@@ -402,7 +396,6 @@
     {
         _rootPersonId = id;
         CloseTopolaOverlay();
-        StateHasChanged();
         return Task.CompletedTask;
     }
 
@@ -418,25 +411,21 @@
         _downloadingTree = true; // skrytý TopolaTree se namountuje a po dokončení zavolá OnHiddenTreeReadyAsync
     }
 
+    /// <summary>
+    /// Volá se i tehdy, když se strom nepostavil — ExportSvgAsync pak vrátí null. Obě JS volání
+    /// výjimky polykají, takže příznak se shodí vždy a tlačítko nezůstane zablokované.
+    /// </summary>
     private async Task OnHiddenTreeReadyAsync()
     {
-        try
+        var svg = _hiddenTopolaTree is null ? null : await _hiddenTopolaTree.ExportSvgAsync();
+        var ok = !string.IsNullOrEmpty(svg)
+                 && await TryInvokeExportAsync("downloadSvg", svg, "koreny-rodokmen.svg");
+        if (!ok)
         {
-            if (_hiddenTopolaTree is not null)
-            {
-                var svg = await _hiddenTopolaTree.ExportSvgAsync();
-                if (!string.IsNullOrEmpty(svg))
-                {
-                    var module = await GetExportModuleAsync();
-                    await module.InvokeVoidAsync("downloadSvg", svg, "koreny-rodokmen.svg");
-                }
-            }
+            _errorMessage = "Rodokmen se nepodařilo stáhnout.";
         }
-        finally
-        {
-            _downloadingTree = false; // odmountuje skrytý kontejner → DisposeAsync uklidí
-            StateHasChanged();
-        }
+
+        _downloadingTree = false; // odmountuje skrytý kontejner → DisposeAsync uklidí
     }
 
     /// <summary>
@@ -475,7 +464,6 @@
     private Task OnTreePersonSelected(string id)
     {
         _rootPersonId = id;
-        StateHasChanged();
         return Task.CompletedTask;
     }
 
@@ -483,14 +471,12 @@
     {
         _rootPersonId = id;
         await OpenPersonForEditAsync(id);
-        StateHasChanged();
     }
 
     /// <summary>Klik na řádek seznamu = výběr osoby (řídí HourglassTree i akce rodokmenu). Bez toggle, bez otevření editoru.</summary>
     private void SelectPerson(string id)
     {
         _rootPersonId = id;
-        StateHasChanged();
     }
 
     /// <summary>
@@ -500,7 +486,6 @@
     private void SelectFamily(string id)
     {
         _selectedFamilyId = id;
-        StateHasChanged();
     }
 
     /// <summary>Hledané výrazy vlastní stránka, aby je výměna dokumentu vynulovala; filtrují je panely.</summary>
@@ -532,7 +517,6 @@
         }
 
         StartNewPerson();
-        StateHasChanged();
     }
 
     private async Task StartNewPersonThenReturnToFamilyAsync()
@@ -544,7 +528,6 @@
 
         _returnToNewFamilyAfterPerson = true;
         StartNewPerson();
-        StateHasChanged();
     }
 
     private void OpenPersonForEdit(string id)
@@ -571,7 +554,6 @@
         }
 
         OpenPersonForEdit(id);
-        StateHasChanged();
     }
 
     private void SavePerson()
@@ -609,7 +591,6 @@
         }
 
         EnsureRootPersonId();
-        StateHasChanged();
     }
 
     /// <summary>
@@ -705,7 +686,6 @@
         }
 
         StartNewFamily();
-        StateHasChanged();
     }
 
     private void OpenFamilyForEdit(string id)
@@ -745,7 +725,6 @@
         }
 
         OpenFamilyForEdit(id);
-        StateHasChanged();
     }
 
     private void ClearFamilyForm()
@@ -832,7 +811,6 @@
         _dirty = true;
         ClosePanel();
         EnsureSelectedFamilyId();
-        StateHasChanged();
     }
 
     /// <summary>
@@ -849,7 +827,7 @@
         var fam = _doc.Families.FirstOrDefault(x => x.Id == _editFamilyId);
         if (fam is not null)
         {
-            if (!await JSRuntime.InvokeAsync<bool>("confirm", DeleteFamilyQuestion(fam)))
+            if (!await ConfirmAsync(DeleteFamilyQuestion(fam)))
             {
                 return;
             }
@@ -860,7 +838,6 @@
         _dirty = true;
         ClosePanel();
         EnsureSelectedFamilyId();
-        StateHasChanged();
     }
 
     private string DeleteFamilyQuestion(GedcomFamily fam)
@@ -946,7 +923,23 @@
                 : "Neuložené změny rodiny se zahodí; rodina zůstane, jak byla.",
         };
 
-        return await JSRuntime.InvokeAsync<bool>("confirm", $"{loss} Pokračovat?");
+        return await ConfirmAsync($"{loss} Pokračovat?");
+    }
+
+    /// <summary>
+    /// <c>window.confirm</c>, který při selhání interopu odpoví „ne". Každý dotaz tu hlídá
+    /// ztrátu dat (princip 7), takže bezpečná odpověď je nechat všechno, jak je.
+    /// </summary>
+    private async Task<bool> ConfirmAsync(string question)
+    {
+        try
+        {
+            return await JSRuntime.InvokeAsync<bool>("confirm", question);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            return false;
+        }
     }
 
     private string NextIndividualId()
@@ -979,7 +972,7 @@
 
     private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
     {
-        _loadError = null;
+        _errorMessage = null;
         var file = e.File;
         if (file is null)
         {
@@ -995,7 +988,7 @@
         }
         catch (Exception ex)
         {
-            _loadError = ex.Message;
+            _errorMessage = ex.Message;
         }
     }
 
@@ -1004,8 +997,7 @@
     {
         if (_dirty)
         {
-            var proceed = await JSRuntime.InvokeAsync<bool>(
-                "confirm",
+            var proceed = await ConfirmAsync(
                 "Nahraný dokument má neuložené změny. Načtením vzorového GEDCOMu se přepíší. Pokračovat?");
             if (!proceed)
             {
@@ -1013,14 +1005,14 @@
             }
         }
 
-        _loadError = null;
+        _errorMessage = null;
         try
         {
             LoadGedcomText(SampleGedcom.ReadText());
         }
         catch (Exception ex)
         {
-            _loadError = ex.Message;
+            _errorMessage = ex.Message;
         }
     }
 
@@ -1038,13 +1030,13 @@
             var question = _dirty
                 ? "Rozdělaný rodokmen má neuložené změny. Založením nového o ně přijdete. Pokračovat?"
                 : "Aktuální rodokmen se zavře a začnete s prázdným. Pokračovat?";
-            if (!await JSRuntime.InvokeAsync<bool>("confirm", question))
+            if (!await ConfirmAsync(question))
             {
                 return;
             }
         }
 
-        _loadError = null;
+        _errorMessage = null;
         ApplyDocument(new GedcomDocument());
     }
 
@@ -1079,20 +1071,31 @@
         }
 
         var text = GedcomWriter.Write(_doc);
-        var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("downloadText", text, "koreny-export.ged", "text/plain;charset=utf-8");
-        _dirty = false;
+        if (await TryInvokeExportAsync("downloadText", text, "koreny-export.ged", "text/plain;charset=utf-8"))
+        {
+            _dirty = false;
+            _errorMessage = null;
+        }
+        else
+        {
+            // Bez souboru nejsou změny nikde uložené — _dirty musí zůstat, ať hlídá strážce i titulek.
+            _errorMessage = "Export GEDCOMu se nepodařil. Změny zůstávají neuložené.";
+        }
     }
 
-    private async ValueTask<IJSObjectReference> GetExportModuleAsync()
+    /// <summary>Volání do export.js; false, když se modul nenačetl nebo funkce v JS selhala.</summary>
+    private async Task<bool> TryInvokeExportAsync(string identifier, params object?[] args)
     {
-        if (_exportModule is not null)
+        try
         {
-            return _exportModule;
+            _exportModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/export.js");
+            await _exportModule.InvokeVoidAsync(identifier, args);
+            return true;
         }
-
-        _exportModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/export.js");
-        return _exportModule;
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            return false;
+        }
     }
 
     public async ValueTask DisposeAsync()

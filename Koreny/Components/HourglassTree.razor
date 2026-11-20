@@ -252,9 +252,8 @@ else
             return;
         }
 
-        var module = await GetExportModuleAsync();
         var name = SanitizeFileName($"koreny-{_root.Id}.svg");
-        await module.InvokeVoidAsync("downloadSvg", BuildSvgMarkup(), name);
+        await TryInvokeExportAsync("downloadSvg", BuildSvgMarkup(), name);
     }
 
     private async Task PrintSvgAsync()
@@ -264,19 +263,20 @@ else
             return;
         }
 
-        var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("printSvg", BuildSvgMarkup());
+        await TryInvokeExportAsync("printSvg", BuildSvgMarkup());
     }
 
-    private async ValueTask<IJSObjectReference> GetExportModuleAsync()
+    /// <summary>Volání do export.js. Selhání se polyká: přijde se jen o stažení/tisk, náhled běží dál.</summary>
+    private async Task TryInvokeExportAsync(string identifier, params object?[] args)
     {
-        if (_exportModule is not null)
+        try
         {
-            return _exportModule;
+            _exportModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/export.js");
+            await _exportModule.InvokeVoidAsync(identifier, args);
         }
-
-        _exportModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/export.js");
-        return _exportModule;
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+        }
     }
 
     public async ValueTask DisposeAsync()

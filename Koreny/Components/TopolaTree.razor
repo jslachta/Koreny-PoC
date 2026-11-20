@@ -32,7 +32,10 @@
     [Parameter]
     public EventCallback<string> OnPersonSelected { get; set; }
 
-    /// <summary>Vyvolá se po dokončení initu (strom stojí, lze exportovat) — pro skrytý download z toolbaru.</summary>
+    /// <summary>
+    /// Vyvolá se po pokusu o init — pro skrytý download z toolbaru. Když init selhal,
+    /// <see cref="ExportSvgAsync"/> vrátí null; volající se to tak dozví a neviselo by čekání.
+    /// </summary>
     [Parameter]
     public EventCallback OnReady { get; set; }
 
@@ -43,13 +46,21 @@
             return;
         }
 
-        _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/topola-view.js");
         _selfRef = DotNetObjectReference.Create(this);
         var settings = Settings ?? new TreeViewSettings();
         var json = TopolaDataMapper.ToJson(Document, settings); // volitelné údaje na kartách filtruje mapper
         var view = settings.ToJson();
-        await _module.InvokeVoidAsync("init", _elementId, json, RootPersonId, view, _selfRef);
-        _initialized = true;
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/topola-view.js");
+            await _module.InvokeVoidAsync("init", _elementId, json, RootPersonId, view, _selfRef);
+            _initialized = true;
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            // Strom se nepostavil (modul se nenačetl, Topola spadla). Kontejner zůstane prázdný;
+            // výjimka z OnAfterRender by položila celou stránku i s rozdělanou prací.
+        }
 
         if (OnReady.HasDelegate)
         {
@@ -60,7 +71,7 @@
     [JSInvokable]
     public Task OnPersonClicked(string id) => OnPersonSelected.InvokeAsync(id);
 
-    /// <summary>Samostatné SVG celého rodokmenu (nezávislé na pan/zoom); null, dokud strom nestojí.</summary>
+    /// <summary>Samostatné SVG celého rodokmenu (nezávislé na pan/zoom); null, dokud strom nestojí nebo když export selže.</summary>
     public async Task<string?> ExportSvgAsync()
     {
         if (_module is null || !_initialized)
@@ -68,7 +79,14 @@
             return null;
         }
 
-        return await _module.InvokeAsync<string>("exportSvg", _elementId);
+        try
+        {
+            return await _module.InvokeAsync<string>("exportSvg", _elementId);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+            return null;
+        }
     }
 
     public async ValueTask DisposeAsync()
