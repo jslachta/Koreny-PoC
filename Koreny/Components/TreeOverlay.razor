@@ -94,8 +94,7 @@
             return;
         }
 
-        var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("downloadSvg", svg, "koreny-rodokmen.svg");
+        await TryInvokeExportAsync("downloadSvg", svg, "koreny-rodokmen.svg");
     }
 
     /// <summary>Tisk exportovaného (zoom-resetnutého) SVG — celý strom, ne aktuální výřez.</summary>
@@ -107,8 +106,7 @@
             return;
         }
 
-        var module = await GetExportModuleAsync();
-        await module.InvokeVoidAsync("printSvg", svg);
+        await TryInvokeExportAsync("printSvg", svg);
     }
 
     private async Task<string?> ExportSvgAsync()
@@ -122,11 +120,20 @@
         return string.IsNullOrEmpty(svg) ? null : svg;
     }
 
-    /// <summary>Modul je natažený už při startu stránky, takže tenhle import jde do paměti.</summary>
-    private async ValueTask<IJSObjectReference> GetExportModuleAsync()
+    /// <summary>
+    /// Volání do export.js. Modul je natažený už při startu stránky, takže import jde do paměti.
+    /// Selhání se polyká: přijde se jen o stažení/tisk, overlay i editor běží dál.
+    /// </summary>
+    private async Task TryInvokeExportAsync(string identifier, params object?[] args)
     {
-        _exportModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/export.js");
-        return _exportModule;
+        try
+        {
+            _exportModule ??= await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/export.js");
+            await _exportModule.InvokeVoidAsync(identifier, args);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException)
+        {
+        }
     }
 
     public async ValueTask DisposeAsync()

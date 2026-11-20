@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   deploy:
@@ -16,7 +18,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
+
+      - name: Test
+        run: dotnet test
 
       - name: Publish
         run: dotnet publish Koreny/Koreny.csproj -c Release -o publish
@@ -33,13 +38,19 @@ jobs:
       - name: Fix index.html
         run: |
           sed -i 's|<base href="/" />|<base href="/Koreny-PoC/" />|g' publish/wwwroot/Koreny-PoC/index.html
-          BLAZOR_JS=$(ls publish/wwwroot/Koreny-PoC/_framework/blazor.webassembly.*.js | xargs basename)
-          sed -i "s|blazor.webassembly#\[\.{fingerprint}\]\.js|_framework/${BLAZOR_JS}|g" publish/wwwroot/Koreny-PoC/index.html
+          # Od .NET 11 SDK placeholdery (blazor.webassembly#[.{fingerprint}].js) rozepíše samo.
+          # Kdyby některý zůstal, stránka by v prohlížeči nenaběhla — radši shodit build.
+          if grep -n '#\[' publish/wwwroot/Koreny-PoC/index.html; then
+            echo "::error::index.html obsahuje nerozepsaný placeholder"
+            exit 1
+          fi
 
       - name: Add .nojekyll
         run: touch publish/wwwroot/.nojekyll
 
       - name: Deploy
+        # Na PR jen ověřit, že test, publish i úprava index.html projdou; nasazuje se až push do main.
+        if: github.event_name == 'push'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
