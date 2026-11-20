@@ -18,6 +18,9 @@ jobs:
         with:
           dotnet-version: 11.0.x
 
+      - name: Test
+        run: dotnet test
+
       - name: Publish
         run: dotnet publish Koreny/Koreny.csproj -c Release -o publish
 
